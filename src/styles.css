@@ -1,0 +1,337 @@
+/* src/styles.css — Sistema visual ATAK.GG (extraído de design/ATAK-Screens.html)
+   Paleta: crimson #E1242E · plata/cromo · negro #0A0A0C.
+   Tipografías: Cinzel (display) · Saira Condensed (datos) · JetBrains Mono (timers). */
+
+:root {
+  --crimson: #E1242E;
+  --crimson-deep: #7d1017;
+  --crimson-soft: #ff9aa0;
+  --ink: #0A0A0C;
+  --ink-2: #101115;
+  --text: #e9ebef;
+  --text-soft: #c9cdd6;
+  --text-dim: #8b8f9a;
+  --text-faint: #5c616c;
+  --metal: #9ba0ab;
+  --metal-dark: #6f7480;
+  --line: #2a2c33;
+  --green: #4dbb63;
+  --panel-bg: rgba(10, 10, 12, 0.88);
+  --panel-bg-strong: rgba(10, 10, 14, 0.94);
+  --border-metal: rgba(200, 205, 214, 0.22);
+  --border-metal-soft: rgba(200, 205, 214, 0.14);
+  --border-crimson: rgba(225, 36, 46, 0.4);
+  --border-crimson-hot: rgba(225, 36, 46, 0.6);
+  --font-display: 'Cinzel', serif;
+  --font-data: 'Saira Condensed', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: transparent; }
+body {
+  font-family: var(--font-data);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+@keyframes atakPulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(225, 36, 46, 0.4); }
+  50% { box-shadow: 0 0 14px rgba(225, 36, 46, 0.85); }
+}
+@keyframes atakDot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ── Recortes angulares (esquinas cortadas TR + BL, marca de la casa) ─────── */
+.cut {
+  --cut: 14px;
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+}
+.cut-sm { --cut: 12px; }
+.cut-lg { --cut: 16px; }
+/* Paralelogramo (chips / botones / badges) */
+.skew {
+  --skew: 8px;
+  clip-path: polygon(var(--skew) 0, 100% 0, calc(100% - var(--skew)) 100%, 0 100%);
+}
+
+/* ── Paneles ──────────────────────────────────────────────────────────────── */
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border-metal);
+}
+.panel-crimson { border-color: var(--border-crimson); }
+
+/* ── Texto metálico / display ─────────────────────────────────────────────── */
+.metal-text {
+  font-family: var(--font-display);
+  background: linear-gradient(180deg, #f5f6f8, #b9bdc6 55%, #7d828e);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.metal-text-bright {
+  font-family: var(--font-display);
+  background: linear-gradient(180deg, #fff, #b9bdc6 60%, #7d828e);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.display { font-family: var(--font-display); }
+.mono { font-family: var(--font-mono); }
+
+/* Etiquetas pequeñas espaciadas */
+.label {
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.label-faint { color: var(--text-faint); }
+
+/* Líneas decorativas */
+.hr {
+  height: 1px;
+  border: none;
+  margin: 0;
+  background: linear-gradient(90deg, transparent, #d7dae1 30%, #d7dae1 70%, transparent);
+}
+.hr-soft { background: linear-gradient(90deg, transparent, var(--metal-dark) 30%, var(--metal-dark) 70%, transparent); }
+.hr-red { background: linear-gradient(90deg, var(--crimson), transparent 70%); }
+
+/* Punto "en vivo" */
+.dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--crimson);
+  animation: atakDot 1.6s infinite;
+  display: inline-block;
+  flex: none;
+}
+.dot-ok { background: var(--green); box-shadow: 0 0 8px rgba(77, 187, 99, 0.6); animation: none; }
+.dot-lg { width: 9px; height: 9px; box-shadow: 0 0 8px rgba(225, 36, 46, 0.7); }
+.dot-off { background: var(--text-faint); animation: none; }
+
+/* ── Chips de estadística (fila de 5 del HUD) ─────────────────────────────── */
+.stat-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgba(200, 205, 214, 0.28);
+  padding: 4px 2px;
+  text-align: center;
+}
+.stat-chip .v { font: 600 13px var(--font-data); }
+.stat-chip .k { font-size: 8.5px; letter-spacing: 0.1em; color: var(--text-dim); }
+
+/* Mini celda combate (AD/AP/ARM/RM) */
+.kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 6px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.kv .k { font-size: 9.5px; color: var(--text-dim); letter-spacing: 0.06em; }
+.kv .v { font: 600 11px var(--font-data); }
+
+/* ── Chip de objetivo (dragón/heraldo/barón) ──────────────────────────────── */
+.obj-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-metal);
+}
+.obj-chip .k { font-size: 8.5px; letter-spacing: 0.12em; color: var(--text-dim); }
+.obj-chip .v { font: 700 12px var(--font-mono); color: var(--text-soft); }
+.obj-chip.live {
+  background: rgba(225, 36, 46, 0.12);
+  border-color: var(--border-crimson-hot);
+  animation: atakPulse 2s infinite;
+}
+.obj-chip.live .k { color: var(--crimson-soft); }
+.obj-chip.live .v { color: #fff; }
+.obj-chip.off .v { color: var(--text-faint); }
+
+/* ── Barras (vida / recurso / daño) ───────────────────────────────────────── */
+.bar { background: #1a1b20; position: relative; overflow: hidden; }
+.bar > i {
+  position: absolute;
+  inset: 0;
+  right: auto;
+  display: block;
+  background: linear-gradient(90deg, var(--crimson-deep), var(--crimson));
+}
+.bar.silver > i { background: linear-gradient(90deg, #4a4e58, var(--metal)); }
+.bar .bar-txt {
+  position: absolute;
+  right: 3px; top: -1px;
+  font: 600 8.5px var(--font-data);
+  color: var(--text);
+}
+.dmg-bar {
+  height: 8px;
+  background: linear-gradient(90deg, var(--crimson-deep), var(--crimson));
+  box-shadow: 0 0 6px rgba(225, 36, 46, 0.35);
+}
+
+/* ── Badges ───────────────────────────────────────────────────────────────── */
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  padding: 3px 12px;
+  display: inline-block;
+}
+.badge-red { color: #fff; background: linear-gradient(100deg, var(--crimson-deep), var(--crimson)); }
+.badge-silver { color: var(--ink); background: linear-gradient(180deg, #f5f6f8, var(--metal)); }
+.badge-outline { color: var(--text-soft); border: 1px solid rgba(200, 205, 214, 0.35); }
+.badge-outline-red { color: var(--crimson); border: 1px solid rgba(225, 36, 46, 0.5); }
+.badge-glow { animation: atakPulse 2s infinite; }
+
+/* ── Botones ──────────────────────────────────────────────────────────────── */
+.btn {
+  font-family: var(--font-data);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  padding: 7px 22px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-transform: uppercase;
+}
+.btn-primary {
+  color: #fff;
+  background: linear-gradient(100deg, var(--crimson-deep), var(--crimson));
+  box-shadow: 0 0 12px rgba(225, 36, 46, 0.4);
+}
+.btn-primary:hover { filter: brightness(1.15); }
+.btn-ghost { color: var(--text-soft); border: 1px solid rgba(200, 205, 214, 0.4); }
+.btn-ghost:hover { color: #fff; border-color: #fff; }
+.btn-big { font-size: 14px; font-weight: 700; letter-spacing: 0.14em; padding: 12px 30px; box-shadow: 0 0 16px rgba(225, 36, 46, 0.45); }
+.btn:disabled { filter: saturate(0.3) brightness(0.7); cursor: default; }
+
+/* ── Inputs ───────────────────────────────────────────────────────────────── */
+.field .label { display: block; font-size: 9.5px; letter-spacing: 0.16em; margin-bottom: 4px; }
+.input {
+  width: 100%;
+  background: var(--ink-2);
+  border: 1px solid rgba(200, 205, 214, 0.2);
+  padding: 7px 10px;
+  font-family: var(--font-data);
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  user-select: text;
+}
+.input:focus { border-color: var(--border-crimson-hot); }
+.input.mono { font: 12.5px var(--font-mono); }
+.input::placeholder { color: var(--text-faint); }
+
+/* ── Retrato de campeón ───────────────────────────────────────────────────── */
+.champ {
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: linear-gradient(135deg, #2a2c33, #141519);
+  box-shadow: 0 0 0 1px var(--metal-dark);
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--text);
+}
+.champ.enemy { background: linear-gradient(135deg, #331114, #141519); box-shadow: 0 0 0 1px var(--crimson-deep); }
+.champ.round { border-radius: 50%; }
+.champ img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+/* Ítem (icono DDragon) */
+.item {
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: linear-gradient(135deg, #23252b, #101115);
+  box-shadow: 0 0 0 1px var(--metal-dark);
+  font: 700 9px var(--font-display);
+  color: var(--text-soft);
+}
+.item.core { background: linear-gradient(135deg, #3a1216, #101115); box-shadow: 0 0 0 1px var(--crimson); color: #fff; }
+.item img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+/* ── Barra de título (ventana principal) ──────────────────────────────────── */
+.drag { -webkit-app-region: drag; }
+.no-drag { -webkit-app-region: no-drag; }
+.tb-btn {
+  width: 44px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--text-dim);
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+}
+.tb-btn:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.tb-btn.close:hover { background: var(--crimson); color: #fff; }
+
+/* Riel de navegación */
+.rail-btn {
+  width: 44px; height: 44px;
+  display: grid;
+  place-items: center;
+  color: var(--metal-dark);
+  cursor: pointer;
+  position: relative;
+  border: none;
+  background: none;
+}
+.rail-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); }
+.rail-btn.active { background: rgba(225, 36, 46, 0.14); border-left: 2px solid var(--crimson); color: #fff; }
+
+/* ── Fila de habilidad (orden de skills) ──────────────────────────────────── */
+.sk {
+  height: 16px;
+  display: grid;
+  place-items: center;
+  font: 600 9px var(--font-data);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-soft);
+}
+.sk.q { background: rgba(225, 36, 46, 0.85); color: #fff; }
+.sk.r { background: linear-gradient(180deg, #f5f6f8, var(--metal)); color: var(--ink); }
+
+/* Consejo (tip) */
+.tip {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--text-soft);
+  border-left: 2px solid var(--metal);
+  padding-left: 8px;
+}
+.tip.hot { border-left-color: var(--crimson); }
+
+/* Medallón de dragón tomado */
+.medal {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #23252b, #101115);
+  box-shadow: 0 0 0 1px var(--metal-dark);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+/* Scrollbars discretos */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--metal-dark); }
