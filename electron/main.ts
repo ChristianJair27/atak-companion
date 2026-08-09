@@ -50,7 +50,7 @@ function makeOverlayWindow(kind: WinKind, opts: { w: number; h: number; x?: numb
     show: false,
     alwaysOnTop: true,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -72,9 +72,13 @@ function ensure(kind: WinKind): BrowserWindow {
       const win = new BrowserWindow({
         width: 1120, height: 720, minWidth: 900, minHeight: 600,
         frame: false, backgroundColor: '#0a0a0c', show: true,
-        webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
+        webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false },
       });
       win.on('closed', () => wins.delete('main'));
+      // Nunca depurar a ciegas: en dev, DevTools abierto y errores de carga al log.
+      if (DEV_URL) win.webContents.openDevTools({ mode: 'detach' });
+      win.webContents.on('did-fail-load', (_e, code, desc, url) =>
+        console.error('[main-window] did-fail-load', code, desc, url));
       loadView(win, 'main');
       wins.set('main', win);
       return win;
@@ -86,7 +90,7 @@ function ensure(kind: WinKind): BrowserWindow {
     case 'eog': {
       const win = new BrowserWindow({
         width: 960, height: 660, frame: false, transparent: true, show: false, center: true,
-        webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
+        webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false },
       });
       win.once('ready-to-show', () => win.show());
       win.on('closed', () => wins.delete('eog'));

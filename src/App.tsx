@@ -38,6 +38,17 @@ declare global {
 const view = new URLSearchParams(location.search).get('view') || 'main';
 
 export default function App() {
+  // Guard anti-pantalla-negra: si el preload no cargó (window.atak ausente),
+  // mostrar el error en vez de tronar en silencio.
+  if (!window.atak) {
+    return (
+      <div style={{ padding: 24, fontFamily: 'monospace', color: '#ff6b73', background: '#0a0a0c', minHeight: '100vh' }}>
+        <b>ATAK Companion — error de arranque</b>
+        <p>El puente IPC (preload) no cargó: window.atak no existe.</p>
+        <p>Revisa que dist-electron/preload.cjs exista y reinicia con npm run dev.</p>
+      </div>
+    );
+  }
   switch (view) {
     case 'hud': return <HudView />;
     case 'champselect': return <ChampSelectView />;

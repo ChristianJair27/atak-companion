@@ -11,7 +11,15 @@ export default defineConfig({
       {
         entry: 'electron/preload.ts',
         onstart: (o) => o.reload(),
-        vite: { build: { outDir: 'dist-electron', rollupOptions: { external: ['electron'] } } },
+        // OJO: el package es "type":"module", así que un preload .js sería ESM
+        // y Electron lo rechaza en silencio (window.atak nunca existe → pantalla
+        // negra). Forzamos CJS con extensión .cjs.
+        vite: {
+          build: {
+            outDir: 'dist-electron',
+            rollupOptions: { external: ['electron'], output: { format: 'cjs', entryFileNames: 'preload.cjs' } },
+          },
+        },
       },
     ]),
     renderer(),
