@@ -1,6 +1,35 @@
 /* src/styles.css — Sistema visual ATAK.GG (extraído de design/ATAK-Screens.html)
    Paleta: crimson #E1242E · plata/cromo · negro #0A0A0C.
-   Tipografías: Cinzel (display) · Saira Condensed (datos) · JetBrains Mono (timers). */
+   Tipografías: Friz Quadrata (LoL display) · Saira Condensed (datos) · JetBrains Mono. */
+
+@font-face {
+  font-family: 'Friz Quadrata';
+  src: url('/fonts/friz-quadrata-std-medium.otf') format('opentype');
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Friz Quadrata';
+  src: url('/fonts/friz-quadrata-regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Friz Quadrata';
+  src: url('/fonts/friz-quadrata-bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Friz Quadrata';
+  src: url('/fonts/friz-quadrata-italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
 
 :root {
   --crimson: #E1242E;
@@ -22,7 +51,8 @@
   --border-metal-soft: rgba(200, 205, 214, 0.14);
   --border-crimson: rgba(225, 36, 46, 0.4);
   --border-crimson-hot: rgba(225, 36, 46, 0.6);
-  --font-display: 'Cinzel', serif;
+  /* Friz Quadrata = fuente display oficial de League of Legends (como aka.gg) */
+  --font-display: 'Friz Quadrata', 'Cinzel', Georgia, serif;
   --font-data: 'Saira Condensed', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
@@ -177,6 +207,86 @@ body {
   height: 8px;
   background: linear-gradient(90deg, var(--crimson-deep), var(--crimson));
   box-shadow: 0 0 6px rgba(225, 36, 46, 0.35);
+}
+
+/* Riel de daño: el % se mide sobre el rail, no sobre un flex suelto (EOG fix). */
+.dmg-track {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+}
+.dmg-track-rail {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 8px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  position: relative;
+}
+.dmg-track-rail > i {
+  display: block;
+  height: 100%;
+  max-width: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--crimson-deep), var(--crimson));
+  box-shadow: 0 0 8px rgba(225, 36, 46, 0.4);
+  transition: width 0.25s ease;
+}
+.dmg-track-val {
+  flex: none;
+  width: 38px;
+  text-align: right;
+  font: 600 10px var(--font-data);
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Chips de composición (AD/AP/Tank…) */
+.comp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid rgba(200, 205, 214, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-soft);
+  border-radius: 4px;
+}
+.comp-chip.ok {
+  border-color: rgba(77, 187, 99, 0.45);
+  background: rgba(77, 187, 99, 0.1);
+  color: #8fd99e;
+}
+.comp-chip.miss {
+  border-color: rgba(225, 36, 46, 0.45);
+  background: rgba(225, 36, 46, 0.1);
+  color: var(--crimson-soft);
+}
+.comp-chip .n {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Stat chip con icono */
+.stat-chip.iconic {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 56px;
+}
+.stat-chip.iconic .ico {
+  opacity: 0.85;
+  display: grid;
+  place-items: center;
 }
 
 /* ── Badges ───────────────────────────────────────────────────────────────── */

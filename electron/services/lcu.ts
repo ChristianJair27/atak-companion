@@ -38,6 +38,15 @@ const LOCKFILE_CANDIDATES = (): string[] => {
   return [...drives, ...fixed];
 };
 
+export interface RankedSnapshot {
+  queue: string;
+  tier: string | null;
+  division: string | number | null;
+  lp: number;
+  wins: number;
+  losses: number;
+}
+
 export class LcuService extends EventEmitter {
   private lockfile: Lockfile | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -47,6 +56,8 @@ export class LcuService extends EventEmitter {
   private inChampSelect = false;
   /** Ruta extra de lockfile derivada del exe del proceso (si la conocemos). */
   extraLockfileDir: string | null = null;
+  /** LP/rango capturado al entrar InProgress → delta en EOG. */
+  rankedBeforeGame: RankedSnapshot | null = null;
 
   region: string | null = null; // p.ej. 'LA1'
   summoner: { gameName: string; tagLine: string; puuid: string } | null = null;
@@ -106,6 +117,140 @@ export class LcuService extends EventEmitter {
     });
   }
 
+  /**
+   * Petición con cuerpo a la LCU API (PATCH/POST/PUT/DELETE). A diferencia de
+   * `get`, informa del status para poder explicar el fallo en la UI: el cliente
+   * rechaza acciones fuera de turno con 4xx y un mensaje útil.
+   */
+  request<T = any>(
+    method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
+    endpoint: string,
+    body?: unknown,
+  ): Promise<{ ok: boolean; status: number; data: T | null; error?: string }> {
+    const lf = this.lockfile;
+    if (!lf) return Promise.resolve({ ok: false, status: 0, data: null, error: 'Cliente de League no detectado' });
+    const payload = body === undefined ? null : Buffer.from(JSON.stringify(body), 'utf8');
+    return new Promise((resolve) => {
+      const req = https.request({
+        host: '127.0.0.1',
+        port: lf.port,
+        path: endpoint,
+        method,
+        headers: {
+          Authorization: `Basic ${Buffer.from(`riot:${lf.password}`).toString('base64')}`,
+          Accept: 'application/json',
+          ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': payload.length } : {}),
+        },
+        agent: new https.Agent({ rejectUnauthorized: false }),
+        timeout: 4000,
+      }, (res) => {
+        let raw = '';
+        res.on('data', (c) => (raw += c));
+        res.on('end', () => {
+          const status = res.statusCode ?? 0;
+          let data: any = null;
+          try { data = raw ? JSON.parse(raw) : null; } catch { /* 204 o texto plano */ }
+          const ok = status >= 200 && status < 300;
+          resolve({
+            ok,
+            status,
+            data,
+            error: ok ? undefined : String(data?.message || data?.errorCode || raw || `HTTP ${status}`),
+          });
+        });
+      });
+      req.on('timeout', () => { req.destroy(); resolve({ ok: false, status: 0, data: null, error: 'timeout LCU' }); });
+      req.on('error', (e) => resolve({ ok: false, status: 0, data: null, error: e.message }));
+      if (payload) req.write(payload);
+      req.end();
+    });
+  }
+
+  /** Acción de champ select del jugador local pendiente (pick o ban). */
+  private async myAction(type: 'pick' | 'ban'): Promise<{ id: number; isInProgress: boolean } | null> {
+    const session = await this.get<any>('/lol-champ-select/v1/session');
+    const cell = session?.localPlayerCellId;
+    if (cell == null) return null;
+    for (const group of (session?.actions || []) as any[][]) {
+      for (const a of group || []) {
+        if (Number(a?.actorCellId) === Number(cell) && String(a?.type) === type && !a?.completed) {
+          return { id: Number(a.id), isInProgress: Boolean(a.isInProgress) };
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Deja el campeón en "hover" (intención de pick, visible para tu equipo). */
+  async hoverChampion(championId: number): Promise<{ ok: boolean; error?: string }> {
+    if (!championId) return { ok: false, error: 'Campeón inválido' };
+    const action = await this.myAction('pick');
+    if (!action) return { ok: false, error: 'No tienes un pick pendiente en esta selección' };
+    const r = await this.request('PATCH', `/lol-champ-select/v1/session/actions/${action.id}`, { championId });
+    return r.ok ? { ok: true } : { ok: false, error: r.error };
+  }
+
+  /** Confirma el pick (lock in). Solo funciona cuando es tu turno. */
+  async lockChampion(championId?: number): Promise<{ ok: boolean; error?: string }> {
+    const action = await this.myAction('pick');
+    if (!action) return { ok: false, error: 'No tienes un pick pendiente en esta selección' };
+    if (!action.isInProgress) return { ok: false, error: 'Aún no es tu turno de pickear' };
+    if (championId) {
+      const p = await this.request('PATCH', `/lol-champ-select/v1/session/actions/${action.id}`, { championId });
+      if (!p.ok) return { ok: false, error: p.error };
+    }
+    const r = await this.request('POST', `/lol-champ-select/v1/session/actions/${action.id}/complete`, {});
+    return r.ok ? { ok: true } : { ok: false, error: r.error };
+  }
+
+  /**
+   * Crea (o reemplaza) una página de runas y la deja seleccionada. Reutiliza
+   * siempre la misma página ATAK para no llenarle el inventario al jugador.
+   */
+  async applyRunePage(page: {
+    name: string;
+    primaryStyleId: number;
+    subStyleId: number;
+    selectedPerkIds: number[];
+  }): Promise<{ ok: boolean; error?: string }> {
+    if (!page.primaryStyleId || !page.subStyleId || page.selectedPerkIds.length !== 9) {
+      return { ok: false, error: 'Página de runas incompleta (se esperan 9 runas)' };
+    }
+    const pagesRes = await this.request<any[]>('GET', '/lol-perks/v1/pages');
+    if (!pagesRes.ok) return { ok: false, error: pagesRes.error || 'No se pudieron leer tus páginas de runas' };
+    const pages = Array.isArray(pagesRes.data) ? pagesRes.data : [];
+
+    // Reutilizamos siempre la misma página ATAK: se borra la anterior y punto.
+    const mine = pages.filter((p: any) => p?.isDeletable && String(p?.name || '').startsWith('ATAK'));
+    for (const p of mine) await this.request('DELETE', `/lol-perks/v1/pages/${p.id}`);
+
+    // Si el inventario sigue lleno, NO tocamos páginas del jugador: preferimos
+    // fallar y que él decida cuál borrar.
+    const remaining = pages.filter((p: any) => p?.isDeletable && !mine.some((m: any) => m.id === p.id));
+    const inv = await this.request<any>('GET', '/lol-perks/v1/inventory');
+    const owned = Number(inv.data?.ownedPageCount) || 0;
+    if (owned && remaining.length >= owned) {
+      return {
+        ok: false,
+        error: 'No te quedan espacios de runas libres. Borra una página en el cliente y vuelve a darle.',
+      };
+    }
+
+    const created = await this.request<any>('POST', '/lol-perks/v1/pages', {
+      name: page.name.slice(0, 24),
+      primaryStyleId: page.primaryStyleId,
+      subStyleId: page.subStyleId,
+      selectedPerkIds: page.selectedPerkIds,
+      current: true,
+    });
+    if (!created.ok) return { ok: false, error: created.error || 'El cliente rechazó la página' };
+
+    // Algunos clientes no la dejan activa al crearla.
+    const id = Number(created.data?.id);
+    if (id) await this.request('PUT', '/lol-perks/v1/currentpage', id);
+    return { ok: true };
+  }
+
   private async poll() {
     if (!this.lockfile) {
       this.lockfile = this.findLockfile();
@@ -127,8 +272,13 @@ export class LcuService extends EventEmitter {
     }
 
     if (phase !== this.phase) {
+      const prev = this.phase;
       this.phase = phase;
       if (phase !== 'EndOfGame' && phase !== 'PreEndOfGame' && phase !== 'WaitingForStats') this.eogFetched = false;
+      // Snapshot de ranked al entrar a partida (para calcular ΔLP al final).
+      if ((phase === 'InProgress' || phase === 'GameStart') && prev !== 'InProgress' && prev !== 'GameStart') {
+        void this.snapshotRankedBeforeGame();
+      }
       this.emit('phase', phase);
     }
 
@@ -143,9 +293,72 @@ export class LcuService extends EventEmitter {
       const eog = await this.get('/lol-end-of-game/v1/eog-stats-block');
       if (eog && !(eog as any).errorCode) {
         this.eogFetched = true;
-        this.emit('eog-stats', eog);
+        // Ranked post-partida (puede tardar 1–2s en actualizar LP; reintentamos).
+        const ranked = await this.fetchRankedWithRetry();
+        this.emit('eog-stats', { eog, ranked });
       }
     }
+  }
+
+  /** Solo/Duo preferido; Flex si no hay solo. */
+  async getRankedSnapshot(): Promise<RankedSnapshot | null> {
+    const data = await this.get<any>('/lol-ranked/v1/current-ranked-stats');
+    if (!data || data.errorCode) return null;
+    const qmap = data.queueMap || data.queues || {};
+    const solo =
+      qmap.RANKED_SOLO_5x5 ||
+      qmap['RANKED_SOLO_5x5'] ||
+      (Array.isArray(data.queues)
+        ? data.queues.find((q: any) => q.queueType === 'RANKED_SOLO_5x5')
+        : null) ||
+      qmap.RANKED_FLEX_SR ||
+      null;
+    if (!solo) return null;
+    const tier = solo.tier && solo.tier !== 'NONE' && solo.tier !== 'UNRANKED' ? String(solo.tier) : null;
+    return {
+      queue: String(solo.queueType || 'RANKED_SOLO_5x5'),
+      tier,
+      division: solo.division ?? solo.rank ?? null,
+      lp: Number(solo.leaguePoints ?? solo.lp ?? 0) || 0,
+      wins: Number(solo.wins ?? 0) || 0,
+      losses: Number(solo.losses ?? 0) || 0,
+    };
+  }
+
+  private async snapshotRankedBeforeGame() {
+    const snap = await this.getRankedSnapshot();
+    if (snap) this.rankedBeforeGame = snap;
+  }
+
+  private async fetchRankedWithRetry(): Promise<{
+    before: RankedSnapshot | null;
+    after: RankedSnapshot | null;
+    lpDelta: number | null;
+  }> {
+    const before = this.rankedBeforeGame;
+    let after = await this.getRankedSnapshot();
+    // A veces el LCU tarda en reflejar el LP; 2 reintentos cortos.
+    for (let i = 0; i < 2 && after && before && after.lp === before.lp; i++) {
+      await new Promise((r) => setTimeout(r, 1200));
+      after = await this.getRankedSnapshot();
+    }
+    let lpDelta: number | null = null;
+    if (before && after && before.tier && after.tier) {
+      // Delta simple en LP (no cruza divisiones de forma perfecta, pero cubre el caso típico).
+      if (before.tier === after.tier && String(before.division) === String(after.division)) {
+        lpDelta = after.lp - before.lp;
+      } else {
+        // Promo / up/down de división: marcar cambio con signo por wins.
+        lpDelta = after.lp - before.lp;
+        // Si tier subió, forzar positivo al menos +1 visual
+        const order = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'];
+        const bi = order.indexOf(String(before.tier).toUpperCase());
+        const ai = order.indexOf(String(after.tier).toUpperCase());
+        if (ai > bi) lpDelta = Math.max(lpDelta ?? 0, 1);
+        if (ai < bi) lpDelta = Math.min(lpDelta ?? 0, -1);
+      }
+    }
+    return { before, after, lpDelta };
   }
 
   private async pollChampSelect() {

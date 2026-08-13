@@ -20,6 +20,14 @@ export interface PlayerLite {
   position: string;
   items: number[];
   isMe: boolean;
+  /** Summoner spell raw IDs from Live Client (displayName when id missing). */
+  spell1: number | string;
+  spell2: number | string;
+  /** Keystone + tree ids when present. */
+  keystoneId: number;
+  primaryRuneTree: number;
+  secondaryRuneTree: number;
+  skinID: number;
 }
 
 export interface GameState {
@@ -103,6 +111,19 @@ export class LiveClientService extends EventEmitter {
 
     const players: PlayerLite[] = (d.allPlayers || []).map((p: any) => {
       const riotId = p.riotId || p.summonerName || '';
+      const runes = p.runes || {};
+      const spells = p.summonerSpells || {};
+      const spellId = (slot: any): number | string => {
+        if (!slot) return 0;
+        // Preferir el token canónico "SummonerFlash" del rawDescription
+        // (el displayName en clientes ES sale "Destello" y rompe el icono).
+        const raw = String(slot.rawDescription || slot.rawDisplayName || '');
+        const m = raw.match(/Summoner[A-Za-z]+/);
+        if (m) return m[0];
+        if (typeof slot.key === 'number' && slot.key > 0) return slot.key;
+        if (typeof slot.key === 'string' && slot.key.startsWith('Summoner')) return slot.key;
+        return slot.rawDisplayName || slot.displayName || slot.key || 0;
+      };
       return {
         championName: p.championName || '',
         riotId,
@@ -117,8 +138,18 @@ export class LiveClientService extends EventEmitter {
         isDead: !!p.isDead,
         respawnTimer: Math.max(0, Math.round(p.respawnTimer ?? 0)),
         position: p.position || '',
-        items: (p.items || []).map((it: any) => it.itemID).filter((n: number) => n > 0),
+        items: (p.items || [])
+          .slice()
+          .sort((a: any, b: any) => (a.slot ?? 0) - (b.slot ?? 0))
+          .map((it: any) => it.itemID)
+          .filter((n: number) => n > 0),
         isMe: Boolean(activeName) && riotId.toLowerCase() === activeName.toLowerCase(),
+        spell1: spellId(spells.summonerSpellOne),
+        spell2: spellId(spells.summonerSpellTwo),
+        keystoneId: Number(runes.keystone?.id ?? runes.keystoneID ?? 0) || 0,
+        primaryRuneTree: Number(runes.primaryRuneTree?.id ?? runes.primaryRuneTreeId ?? 0) || 0,
+        secondaryRuneTree: Number(runes.secondaryRuneTree?.id ?? runes.secondaryRuneTreeId ?? 0) || 0,
+        skinID: Number(p.skinID ?? 0) || 0,
       };
     });
 

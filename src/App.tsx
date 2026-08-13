@@ -1,4 +1,4 @@
-// src/App.tsx — router por ventana (?view=main|hud|champselect|scoreboard|eog|caster)
+// src/App.tsx — router por ventana (?view=main|hud|champselect|scoreboard|players|eog|caster)
 // Diseño definitivo (design/ATAK-Screens.html): crimson #E1242E · plata/cromo ·
 // negro #0A0A0C. Las vistas viven en src/views/* y consumen los datos reales de
 // la capa Electron vía window.atak (declarado abajo).
@@ -6,6 +6,7 @@ import MainView from './views/MainView';
 import HudView from './views/HudView';
 import ChampSelectView from './views/ChampSelectView';
 import ScoreboardView from './views/ScoreboardView';
+import PlayersView from './views/PlayersView';
 import EogView from './views/EogView';
 import CasterView from './views/CasterView';
 
@@ -29,6 +30,45 @@ declare global {
       onLcuDisconnected: (fn: () => void) => () => void;
       casterStart: (cfg: any) => Promise<any>;
       casterStop: () => Promise<any>;
+      opggRoster: () => Promise<any>;
+      opggBuild: (championName: string, position: string) => Promise<any>;
+      championPreview: (
+        championName: string,
+        position: string,
+        rival?: string,
+      ) => Promise<{ ok: boolean; championId?: number }>;
+      matchupData: (championName: string, opponentName: string, position: string) => Promise<any>;
+      champSelectHover: (championName: string) => Promise<{ ok: boolean; error?: string }>;
+      champSelectLock: (championName?: string) => Promise<{ ok: boolean; error?: string }>;
+      applyRunes: (page: {
+        name: string;
+        primaryStyleId: number;
+        subStyleId: number;
+        selectedPerkIds: number[];
+      }) => Promise<{ ok: boolean; error?: string }>;
+      opggPickSuggestions: (payload: {
+        position: string;
+        missingRoles: string[];
+        bannedNames: string[];
+        pickedNames: string[];
+        limit?: number;
+        enemyNames?: string[];
+        rivalName?: string;
+        deep?: boolean;
+      }) => Promise<Array<{
+        name: string;
+        winRate: number | null;
+        pickRate: number | null;
+        tier: number | null;
+        reason: string;
+        score: number;
+        matchupWinRate: number | null;
+        vsRival: string;
+        goodInto: string[];
+        badInto: string[];
+        covers: string[];
+      }>>;
+      togglePlayers: () => Promise<{ ok: boolean; open: boolean }>;
       openExternal: (url: string) => void;
       win: (a: 'minimize' | 'close' | 'hide') => void;
     };
@@ -53,6 +93,7 @@ export default function App() {
     case 'hud': return <HudView />;
     case 'champselect': return <ChampSelectView />;
     case 'scoreboard': return <ScoreboardView />;
+    case 'players': return <PlayersView />;
     case 'eog': return <EogView />;
     case 'caster': return <CasterView />;
     default: return <MainView />;

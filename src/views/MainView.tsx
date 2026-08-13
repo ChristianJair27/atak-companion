@@ -71,8 +71,17 @@ export default function MainView() {
       <div className="drag" style={{ height: 38, flex: 'none', display: 'flex', alignItems: 'center', paddingLeft: 14, background: 'linear-gradient(180deg,#111216,#0A0A0C)', borderBottom: '1px solid rgba(200,205,214,.14)' }}>
         <img src={logo} alt="" style={{ height: 24, marginRight: 8 }} />
         <span className="metal-text" style={{ fontWeight: 700, fontSize: 13, letterSpacing: '0.2em' }}>ATAK.GG</span>
-        <span style={{ marginLeft: 10, fontSize: 10, letterSpacing: '0.1em', color: 'var(--text-faint)' }}>v0.1.0</span>
-        <div className="no-drag" style={{ marginLeft: 'auto', display: 'flex', height: '100%' }}>
+        <span style={{ marginLeft: 10, fontSize: 10, letterSpacing: '0.1em', color: 'var(--text-faint)' }}>v0.1.0 · F9 HUD · F8 players · Ctrl+Shift+S score</span>
+        <div className="no-drag" style={{ marginLeft: 'auto', display: 'flex', height: '100%', alignItems: 'center', gap: 4 }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ padding: '4px 12px', fontSize: 10, height: 26 }}
+            title="Abrir panel de jugadores (F8 / Ctrl+A)"
+            onClick={() => { void window.atak.togglePlayers(); }}
+          >
+            JUGADORES · F8
+          </button>
           <button className="tb-btn" onClick={() => window.atak.win('minimize')} aria-label="Minimizar">
             <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 5 H9" stroke="currentColor" strokeWidth="1.2" /></svg>
           </button>
@@ -128,7 +137,19 @@ export default function MainView() {
                   )}
                 </span>
               </div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-faint)' }}>Overlay activo · datos en vivo cada 2 s</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-faint)' }}>
+                Overlay · F9 HUD · <b style={{ color: 'var(--text-soft)' }}>F8 jugadores</b> · Ctrl+Shift+S score
+              </div>
+              {(status?.inGame || status?.phase === 'InProgress') && (
+                <button
+                  type="button"
+                  className="btn btn-primary skew"
+                  style={{ '--skew': '8px', alignSelf: 'flex-start', marginTop: 4 } as any}
+                  onClick={() => { void window.atak.togglePlayers(); }}
+                >
+                  ABRIR JUGADORES (F8)
+                </button>
+              )}
             </div>
 
             {/* Invocador */}

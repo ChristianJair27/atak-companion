@@ -28,6 +28,34 @@ contextBridge.exposeInMainWorld('atak', {
   // modo caster
   casterStart: (cfg: any) => ipcRenderer.invoke('caster-start', cfg),
   casterStop: () => ipcRenderer.invoke('caster-stop'),
+  // OP.GG MCP (elo / WR / build / runas / sugerencias)
+  opggRoster: () => ipcRenderer.invoke('opgg-roster'),
+  opggBuild: (championName: string, position: string) =>
+    ipcRenderer.invoke('opgg-build', championName, position),
+  championPreview: (championName: string, position: string, rival?: string) =>
+    ipcRenderer.invoke('champion-preview', championName, position, rival),
+  opggPickSuggestions: (payload: {
+    position: string;
+    missingRoles: string[];
+    bannedNames: string[];
+    pickedNames: string[];
+    limit?: number;
+    enemyNames?: string[];
+    rivalName?: string;
+    deep?: boolean;
+  }) => ipcRenderer.invoke('opgg-pick-suggestions', payload),
+  matchupData: (championName: string, opponentName: string, position: string) =>
+    ipcRenderer.invoke('matchup-data', championName, opponentName, position),
+  // Acciones sobre el cliente de League (siempre disparadas por el usuario)
+  champSelectHover: (championName: string) => ipcRenderer.invoke('champ-select-hover', championName),
+  champSelectLock: (championName?: string) => ipcRenderer.invoke('champ-select-lock', championName),
+  applyRunes: (page: {
+    name: string;
+    primaryStyleId: number;
+    subStyleId: number;
+    selectedPerkIds: number[];
+  }) => ipcRenderer.invoke('apply-runes', page),
+  togglePlayers: () => ipcRenderer.invoke('toggle-players'),
   // ventana
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
   win: (action: 'minimize' | 'close' | 'hide') => ipcRenderer.send('win', action),
