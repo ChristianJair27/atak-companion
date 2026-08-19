@@ -362,63 +362,89 @@ export async function getSummonerFullProfile(
   }
 }
 
-export async function getChampionBuild(championName: string, position: string): Promise<OPGGBuild | null> {
+// Modos que OP.GG diferencia. Flex usa el dataset 'ranked' (no existe uno
+// aparte y el meta es el mismo); ARAM y Arena sí tienen datos propios.
+export type OpggGameMode = 'ranked' | 'aram' | 'arena';
+
+export async function getChampionBuild(
+  championName: string, position: string, gameMode: OpggGameMode = 'ranked'
+): Promise<OPGGBuild | null> {
   const opggPos = POS_MAP[(position || '').toUpperCase()] ?? 'all';
   const opggChamp = toOPGGChampName(championName);
-  const cacheKey = `build:${opggChamp}:${opggPos}`;
+  const cacheKey = `build:${gameMode}:${opggChamp}:${opggPos}`;
   const cached = cache.get(cacheKey);
   if (cached && cached.exp > Date.now()) return cached.data as OPGGBuild;
 
+  // ARAM/Arena no tienen líneas: OP.GG ignora/rechaza position ahí.
+  if (gameMode !== 'ranked') {
+    try {
+      const alt = await buildFromAnalysis(opggChamp, gameMode, null);
+      if (alt) { cache.set(cacheKey, { data: alt, exp: Date.now() + CACHE_TTL }); return alt; }
+    } catch (e: any) {
+      console.warn(`[opgg] build ${gameMode} falló para ${opggChamp} — fallback ranked:`, e?.message);
+    }
+    // Sin datos del modo → mejor las runas de ranked que nada.
+  }
+
   try {
-    const result = await callTool('lol_get_champion_analysis', {
-      game_mode: 'ranked',
-      champion: opggChamp,
-      position: opggPos === 'all' ? 'mid' : opggPos,
-      desired_output_fields: [
-        'data.runes',
-        'data.core_items',
-        'data.boots',
-        'data.starter_items',
-        'data.skills',
-        'data.summary.average_stats',
-      ],
-    });
-    const d = result?.data;
-    if (!d?.runes?.primary_rune_ids?.length) return null;
-    const runes = d.runes;
-    const stat_mods: number[] = Array.isArray(runes.stat_mod_ids) ? runes.stat_mod_ids : [];
-    const rune_ids = [
-      ...(runes.primary_rune_ids as number[]),
-      ...(runes.secondary_rune_ids as number[]),
-      ...stat_mods.slice(0, 3),
-    ];
-    while (rune_ids.length < 9) rune_ids.push(5001);
-    const avg = d.summary?.average_stats;
-    const build: OPGGBuild = {
-      rune_ids,
-      primary_rune_names: runes.primary_rune_names ?? [],
-      secondary_rune_names: runes.secondary_rune_names ?? [],
-      primary_path_id: runes.primary_page_id ?? 8000,
-      secondary_path_id: runes.secondary_page_id ?? 8300,
-      core_item_ids: d.core_items?.ids ?? [],
-      core_item_names: d.core_items?.ids_names ?? [],
-      boots_id: d.boots?.ids?.[0] ?? 3006,
-      boots_name: d.boots?.ids_names?.[0] ?? '',
-      starter_ids: d.starter_items?.ids ?? [],
-      starter_names: d.starter_items?.ids_names ?? [],
-      skill_order: d.skills?.order ?? [],
-      win_rate: avg?.win_rate ?? null,
-      pick_rate: avg?.pick_rate ?? null,
-      ban_rate: avg?.ban_rate ?? null,
-      tier: avg?.tier ?? null,
-      rank: avg?.rank ?? null,
-    };
+    const build = await buildFromAnalysis(opggChamp, 'ranked', opggPos === 'all' ? 'mid' : opggPos);
+    if (!build) return null;
     cache.set(cacheKey, { data: build, exp: Date.now() + CACHE_TTL });
     return build;
   } catch (e: any) {
     console.warn('[opgg] build failed', championName, e?.message);
     return null;
   }
+}
+
+// Llamada + parse de lol_get_champion_analysis para cualquier modo.
+async function buildFromAnalysis(
+  opggChamp: string, gameMode: OpggGameMode, position: string | null
+): Promise<OPGGBuild | null> {
+  const args: Record<string, any> = {
+    game_mode: gameMode,
+    champion: opggChamp,
+    desired_output_fields: [
+      'data.runes',
+      'data.core_items',
+      'data.boots',
+      'data.starter_items',
+      'data.skills',
+      'data.summary.average_stats',
+    ],
+  };
+  if (position) args.position = position;
+  const result = await callTool('lol_get_champion_analysis', args);
+  const d = result?.data;
+  if (!d?.runes?.primary_rune_ids?.length) return null;
+  const runes = d.runes;
+  const stat_mods: number[] = Array.isArray(runes.stat_mod_ids) ? runes.stat_mod_ids : [];
+  const rune_ids = [
+    ...(runes.primary_rune_ids as number[]),
+    ...(runes.secondary_rune_ids as number[]),
+    ...stat_mods.slice(0, 3),
+  ];
+  while (rune_ids.length < 9) rune_ids.push(5001);
+  const avg = d.summary?.average_stats;
+  return {
+    rune_ids,
+    primary_rune_names: runes.primary_rune_names ?? [],
+    secondary_rune_names: runes.secondary_rune_names ?? [],
+    primary_path_id: runes.primary_page_id ?? 8000,
+    secondary_path_id: runes.secondary_page_id ?? 8300,
+    core_item_ids: d.core_items?.ids ?? [],
+    core_item_names: d.core_items?.ids_names ?? [],
+    boots_id: d.boots?.ids?.[0] ?? 3006,
+    boots_name: d.boots?.ids_names?.[0] ?? '',
+    starter_ids: d.starter_items?.ids ?? [],
+    starter_names: d.starter_items?.ids_names ?? [],
+    skill_order: d.skills?.order ?? [],
+    win_rate: avg?.win_rate ?? null,
+    pick_rate: avg?.pick_rate ?? null,
+    ban_rate: avg?.ban_rate ?? null,
+    tier: avg?.tier ?? null,
+    rank: avg?.rank ?? null,
+  };
 }
 
 // ── Counters (matchup guide OP.GG MCP) ───────────────────────────────────────

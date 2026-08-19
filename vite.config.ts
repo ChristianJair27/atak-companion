@@ -19,7 +19,8 @@ export default defineConfig({
         vite: {
           build: {
             outDir: 'dist-electron',
-            rollupOptions: { external: ['electron'] },
+            // uiohook-napi es módulo nativo (.node): jamás bundlearlo.
+            rollupOptions: { external: ['electron', 'uiohook-napi'] },
           },
         },
       },

@@ -14,6 +14,7 @@ import {
   fmtClock,
   fmtK,
   modeEs,
+  openProfile,
   usePatch,
   type PatchInfo,
 } from './shared';
@@ -69,6 +70,13 @@ function getItems(p: any): number[] {
     }
   }
   return arr;
+}
+
+/** Riot ID "Nombre#TAG" desde el bloque EOG crudo (para abrir el perfil ATAK). */
+function riotIdOf(p: any): string {
+  const g = st(p, 'riotIdGameName', 'gameName');
+  const t = st(p, 'riotIdTagLine', 'riotIdTagline', 'tagLine');
+  return g && t ? `${g}#${t}` : '';
 }
 
 function playerName(p: any): string {
@@ -259,6 +267,7 @@ export default function EogView() {
         return (
           <div
             key={i}
+            className="eog-row"
             style={{
               display: 'grid',
               gridTemplateColumns: '36px minmax(90px,1.2fr) 72px 132px minmax(90px,1fr) 56px 48px 40px',
@@ -266,6 +275,7 @@ export default function EogView() {
               background: r.isLocal ? 'rgba(225,36,46,.1)' : 'rgba(255,255,255,.03)',
               borderLeft: `2px solid ${r.isLocal ? 'var(--crimson)' : accent}`,
               padding: '6px 6px',
+              animationDelay: `${0.05 + i * 0.05}s`,
             }}
           >
             <div style={{ position: 'relative' }}>
@@ -278,11 +288,16 @@ export default function EogView() {
               </span>
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{
-                fontSize: 12, fontWeight: r.isLocal ? 700 : 500,
-                color: r.isLocal ? '#fff' : 'var(--text)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
+              <div
+                className="atak-link no-drag"
+                onClick={() => openProfile(riotIdOf(r.raw))}
+                title="Ver perfil en ATAK.GG"
+                style={{
+                  fontSize: 12, fontWeight: r.isLocal ? 700 : 500,
+                  color: r.isLocal ? '#fff' : 'var(--text)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}
+              >
                 {r.name}
               </div>
               <div style={{ display: 'flex', gap: 3, marginTop: 2, flexWrap: 'wrap' }}>
@@ -379,7 +394,7 @@ export default function EogView() {
       {/* Hero */}
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', gap: 18, padding: '16px 28px 12px', alignItems: 'stretch' }}>
         {/* Campeón 3D — encuadrado en la card (fit automático) */}
-        <div style={{ width: 200, height: 260, flex: 'none' }}>
+        <div className="anim-rise" style={{ width: 200, height: 260, flex: 'none' }}>
           {meRow ? (
             <ChampionDance
               patch={patch}
@@ -395,8 +410,8 @@ export default function EogView() {
           )}
         </div>
 
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <div className="display" style={{
+        <div className="anim-stagger" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <div className="display anim-hero" style={{
             fontWeight: 800, fontSize: 42, letterSpacing: '0.18em', lineHeight: 1,
             background: isRemake
               ? 'linear-gradient(180deg,#aaa,#555)'
@@ -428,7 +443,9 @@ export default function EogView() {
                 size={40}
               />
               <div style={{ minWidth: 0 }}>
-                <div className="label" style={{ marginBottom: 2 }}>CLASIFICATORIA</div>
+                <div className="label" style={{ marginBottom: 2 }}>
+                  {rankAfter.queue === 'RANKED_FLEX_SR' ? 'CLASIFICATORIA · FLEXIBLE' : 'CLASIFICATORIA · SOLO/DUO'}
+                </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                   {lpDelta != null ? (
                     <span
@@ -497,7 +514,7 @@ export default function EogView() {
               ].map((s) => (
                 <div
                   key={s.k}
-                  className="stat-chip iconic"
+                  className="stat-chip iconic eog-stat"
                   style={{ minWidth: 68, padding: '7px 12px', border: '1px solid rgba(200,205,214,.12)' }}
                 >
                   <span className="ico">{s.ico}</span>
@@ -538,12 +555,12 @@ export default function EogView() {
 
       <div style={{ position: 'relative', zIndex: 1, flex: 1, minHeight: 0, padding: '10px 28px 12px', display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden' }}>
         {tab === 'board' ? (
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div key="board" className="anim-rise" style={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <TeamBlock title="TU EQUIPO" rows={allyRows} accent="#6db3ff" />
             {enemyRows.length > 0 && <TeamBlock title="ENEMIGO" rows={enemyRows} accent="var(--crimson)" />}
           </div>
         ) : tab === 'analysis' ? (
-          <div className="panel" style={{ flex: 1, minHeight: 0, padding: 12, overflow: 'auto' }}>
+          <div key="analysis" className="panel anim-rise" style={{ flex: 1, minHeight: 0, padding: 12, overflow: 'auto' }}>
             <EogRuneAnalysis
               patch={patch}
               myChampion={meRow?.champ || ''}
@@ -559,7 +576,7 @@ export default function EogView() {
             />
           </div>
         ) : (
-          <div className="panel" style={{ flex: 1, minHeight: 0, padding: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div key="timeline" className="panel anim-rise" style={{ flex: 1, minHeight: 0, padding: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <div className="label" style={{ marginBottom: 8 }}>GRIETA · EVENTOS LIVE (mapa DDragon)</div>
             <div style={{ flex: 1, minHeight: 0 }}>
               <MapTimeline events={liveEvents} lenSecs={lenSecs} mapNumber={mapNumber} patch={patch} />

@@ -14,6 +14,8 @@ export interface FeedConfig {
   streamUrl: string;
   team1: string; team2: string;
   logo1: string; logo2: string;
+  /** Color de acento del overlay (hex #rrggbb) — personalización del caster. */
+  accent?: string;
 }
 
 export class FeedPusher {
@@ -38,6 +40,7 @@ export class FeedPusher {
       matchLabel: cfg.matchLabel,
       streamUrl: cfg.streamUrl,
       team1: cfg.team1, team2: cfg.team2, logo1: cfg.logo1, logo2: cfg.logo2,
+      accent: cfg.accent || '',
       players: state.players.map((p) => ({
         riotId: p.riotId,
         championName: p.championName,

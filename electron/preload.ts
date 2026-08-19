@@ -56,7 +56,15 @@ contextBridge.exposeInMainWorld('atak', {
     selectedPerkIds: number[];
   }) => ipcRenderer.invoke('apply-runes', page),
   togglePlayers: () => ipcRenderer.invoke('toggle-players'),
+  toggleOverlay: (kind: 'hud' | 'scoreboard' | 'players' | 'champselect') =>
+    ipcRenderer.invoke('toggle-overlay', kind),
   // ventana
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
   win: (action: 'minimize' | 'close' | 'hide') => ipcRenderer.send('win', action),
+  // Frontend ATAK embebido (perfil de jugador / campeón / cualquier ruta)
+  openProfile: (riotId: string, platform?: string) =>
+    ipcRenderer.send('open-atak-profile', riotId, platform),
+  openAtak: (pagePath: string) => ipcRenderer.send('open-atak', pagePath),
+  // Animación de overlays (show/hide coreografiado desde el main)
+  onOverlayAnim: on('overlay-anim'),
 });

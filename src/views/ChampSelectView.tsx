@@ -5,9 +5,11 @@ import {
   ChampIcon,
   ItemIcon,
   RuneIcon,
+  champSlug,
   champSplashUrl,
   champLoadingUrl,
   fmtClock,
+  openChampionPage,
   posEs,
   usePatch,
   type PatchInfo,
@@ -917,7 +919,13 @@ export default function ChampSelectView() {
                   <div className="label" style={{ marginBottom: 6, color: '#8fd99e' }}>FAVORABLE</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {strong.slice(0, 5).map((c, i) => (
-                      <div key={i} style={{ textAlign: 'center' }}>
+                      <div
+                        key={i}
+                        className="atak-link-img no-drag"
+                        onClick={() => openChampionPage(champSlug(patch, asText(c)))}
+                        title={`${asText(c)} — ver en ATAK.GG`}
+                        style={{ textAlign: 'center' }}
+                      >
                         <ChampIcon patch={patch} name={asText(c)} size={34} style={{ boxShadow: '0 0 0 1px #4d6b52' }} />
                         {typeof c?.winRate === 'number' && (
                           <div className="mono" style={{ fontSize: 9, color: '#8fd99e', marginTop: 2 }}>{c.winRate}%</div>
@@ -931,7 +939,13 @@ export default function ChampSelectView() {
                   <div className="label" style={{ marginBottom: 6, color: 'var(--crimson)' }}>DÉBIL CONTRA</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {weak.slice(0, 5).map((c, i) => (
-                      <div key={i} style={{ textAlign: 'center' }}>
+                      <div
+                        key={i}
+                        className="atak-link-img no-drag"
+                        onClick={() => openChampionPage(champSlug(patch, asText(c)))}
+                        title={`${asText(c)} — ver en ATAK.GG`}
+                        style={{ textAlign: 'center' }}
+                      >
                         <ChampIcon patch={patch} name={asText(c)} size={34} enemy style={{ boxShadow: '0 0 0 1px #E1242E' }} />
                         {typeof c?.winRate === 'number' && (
                           <div className="mono" style={{ fontSize: 9, color: 'var(--crimson-soft)', marginTop: 2 }}>{c.winRate}%</div>

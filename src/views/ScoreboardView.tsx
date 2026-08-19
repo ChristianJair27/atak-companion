@@ -1,7 +1,7 @@
 // src/views/ScoreboardView.tsx — Scoreboard overlay 820×460 (diseño 1c).
 // Dos columnas espejo (azul/rojo) con marcador de kills; fondo transparente.
 import logo from '../assets/atak-logo.png';
-import { ChampIcon, fmtClock, useLive, usePatch } from './shared';
+import { ChampIcon, fmtClock, openProfile, useLive, usePatch } from './shared';
 
 export default function ScoreboardView() {
   const live = useLive();
@@ -20,7 +20,14 @@ export default function ScoreboardView() {
 
   const nameCell = (p: any, right?: boolean) => (
     <span style={{ minWidth: 0, textAlign: right ? 'right' : 'left' }}>
-      <span style={{ display: 'block', fontSize: 12.5, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+      <span
+        className="atak-link no-drag"
+        onClick={() => openProfile(p.riotId || p.name)}
+        title="Ver perfil en ATAK.GG"
+        style={{ display: 'block', fontSize: 12.5, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+      >
+        {p.name}
+      </span>
       <span style={{ display: 'block', fontSize: 9.5, letterSpacing: '0.08em', color: 'var(--text-dim)', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.championName}</span>
     </span>
   );

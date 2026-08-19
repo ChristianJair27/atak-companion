@@ -1,7 +1,7 @@
 {
   "name": "atak-companion",
   "productName": "ATAK Companion",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Companion de escritorio de ATAK.GG: overlay in-game, champ select, scoreboard y modo caster LQC. Electron puro (sin Overwolf).",
   "private": true,
   "type": "module",
@@ -30,7 +30,8 @@
     "framer-motion": "^13.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "three": "^0.185.1"
+    "three": "^0.185.1",
+    "uiohook-napi": "^1.5.5"
   },
   "build": {
     "appId": "gg.atak.companion",
@@ -44,11 +45,14 @@
     ],
     "win": {
       "target": "nsis",
-      "artifactName": "ATAK-Companion-Setup-${version}.exe"
+      "artifactName": "ATAK-Companion-Setup-${version}.exe",
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": true,
-      "perMachine": false
+      "perMachine": false,
+      "artifactName": "ATAK-Companion-Setup-${version}.exe",
+      "shortcutName": "ATAK Companion"
     }
   }
 }

@@ -2,6 +2,8 @@
 // Diseño definitivo (design/ATAK-Screens.html): crimson #E1242E · plata/cromo ·
 // negro #0A0A0C. Las vistas viven en src/views/* y consumen los datos reales de
 // la capa Electron vía window.atak (declarado abajo).
+import { useEffect, useState, type ReactNode } from 'react';
+import { motion } from 'framer-motion';
 import MainView from './views/MainView';
 import HudView from './views/HudView';
 import ChampSelectView from './views/ChampSelectView';
@@ -69,13 +71,39 @@ declare global {
         covers: string[];
       }>>;
       togglePlayers: () => Promise<{ ok: boolean; open: boolean }>;
+      toggleOverlay: (kind: 'hud' | 'scoreboard' | 'players' | 'champselect') => Promise<{ ok: boolean }>;
       openExternal: (url: string) => void;
       win: (a: 'minimize' | 'close' | 'hide') => void;
+      openProfile: (riotId: string, platform?: string) => void;
+      openAtak: (pagePath: string) => void;
+      onOverlayAnim: (fn: (dir: 'in' | 'out') => void) => () => void;
     };
   }
 }
 
 const view = new URLSearchParams(location.search).get('view') || 'main';
+
+// ── Shell animado para overlays ──────────────────────────────────────────────
+// El main manda 'overlay-anim' in/out sincronizado con show/hide de la ventana:
+// entrada con spring (scale+fade+lift) y salida rápida estilo "genie" de Apple.
+// La ventana solo se oculta cuando la salida terminó (200ms en el main).
+function OverlayShell({ children, origin = 'center' }: { children: ReactNode; origin?: 'center' | 'top-right' }) {
+  const [dir, setDir] = useState<'in' | 'out'>('in');
+  useEffect(() => window.atak.onOverlayAnim((d) => setDir(d)), []);
+  return (
+    <motion.div
+      style={{ height: '100vh', transformOrigin: origin === 'top-right' ? '90% 0%' : '50% 40%' }}
+      initial={{ opacity: 0, scale: 0.94, y: 14 }}
+      animate={
+        dir === 'in'
+          ? { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 380, damping: 30, mass: 0.7 } }
+          : { opacity: 0, scale: 0.93, y: 10, transition: { duration: 0.18, ease: [0.4, 0, 1, 1] } }
+      }
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 export default function App() {
   // Guard anti-pantalla-negra: si el preload no cargó (window.atak ausente),
@@ -90,11 +118,12 @@ export default function App() {
     );
   }
   switch (view) {
-    case 'hud': return <HudView />;
-    case 'champselect': return <ChampSelectView />;
-    case 'scoreboard': return <ScoreboardView />;
-    case 'players': return <PlayersView />;
-    case 'eog': return <EogView />;
+    // Overlays con show/hide animado (players/hud/scoreboard se togglean con hotkey)
+    case 'hud': return <OverlayShell origin="top-right"><HudView /></OverlayShell>;
+    case 'champselect': return <OverlayShell><ChampSelectView /></OverlayShell>;
+    case 'scoreboard': return <OverlayShell><ScoreboardView /></OverlayShell>;
+    case 'players': return <OverlayShell><PlayersView /></OverlayShell>;
+    case 'eog': return <OverlayShell><EogView /></OverlayShell>;
     case 'caster': return <CasterView />;
     default: return <MainView />;
   }

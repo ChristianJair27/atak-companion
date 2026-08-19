@@ -27,6 +27,24 @@ export const modeEs = (m: string): string =>
     } as Record<string, string>
   )[(m || '').toUpperCase()] || (m || '').toUpperCase() || 'EN VIVO';
 
+/** Abre el perfil ATAK.GG del jugador (frontend real embebido en la app). */
+export const openProfile = (riotId?: string | null) => {
+  const rid = String(riotId || '').trim();
+  if (rid.includes('#')) window.atak.openProfile(rid);
+};
+
+/** Abre la página de campeón del frontend (slug DDragon, p.ej. "MissFortune"). */
+export const openChampionPage = (slug?: string | null) => {
+  if (slug) window.atak.openAtak(`/champion/${encodeURIComponent(slug)}`);
+};
+
+/** Nombre de campeón mostrado ("Miss Fortune") → slug DDragon ("MissFortune"). */
+export const champSlug = (patch: PatchInfo | null, championName?: string | null): string | null => {
+  if (!patch || !championName) return null;
+  const key = patch.keyByName[norm(championName)];
+  return key != null ? patch.byKey[key]?.id ?? null : null;
+};
+
 export const posEs = (p: string): string =>
   (
     {

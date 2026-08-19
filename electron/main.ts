@@ -9,6 +9,7 @@
 //   EndOfGame        → ventana post-partida
 //   resto            → solo la ventana principal
 import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell } from 'electron';
+import { uIOhook, UiohookKey } from 'uiohook-napi';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LcuService } from './services/lcu.js';
@@ -22,6 +23,7 @@ import {
   getMatchup,
   getPickSuggestions,
   RUNE_PATH_NAMES,
+  type OpggGameMode,
 } from './services/opgg.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -104,9 +106,16 @@ function ensure(kind: WinKind): BrowserWindow {
   switch (kind) {
     case 'main': {
       const win = new BrowserWindow({
-        width: 1120, height: 720, minWidth: 900, minHeight: 600,
+        width: 1180, height: 760, minWidth: 960, minHeight: 620,
         frame: false, backgroundColor: '#0a0a0c', show: true,
-        webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false },
+        webPreferences: {
+          preload: path.join(__dirname, 'preload.cjs'),
+          contextIsolation: true,
+          nodeIntegration: false,
+          // Pestaña "ATAK.GG": el frontend real embebido en un <webview>
+          // (proceso aislado, sin acceso a window.atak).
+          webviewTag: true,
+        },
       });
       win.on('closed', () => wins.delete('main'));
       // Nunca depurar a ciegas: en dev, DevTools abierto y errores de carga al log.
@@ -144,6 +153,67 @@ function closeWin(kind: WinKind) {
   wins.delete(kind);
 }
 
+// ── Show/hide animado de overlays ────────────────────────────────────────────
+// La ventana no puede animarse sola (es frameless/transparente): el contenido
+// reproduce la coreografía (spring de entrada / genie de salida, estilo Apple)
+// y el main sincroniza el hide con el final de la animación.
+const OVERLAY_OUT_MS = 200;
+const hideTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+function animatedShow(win: BrowserWindow, raise: (w: BrowserWindow) => void = (w) => w.showInactive()) {
+  const t = hideTimers.get(win.id);
+  if (t) { clearTimeout(t); hideTimers.delete(win.id); }
+  raise(win);
+  win.webContents.send('overlay-anim', 'in');
+}
+
+function animatedHide(win: BrowserWindow) {
+  if (!win.isVisible() || hideTimers.has(win.id)) return;
+  win.webContents.send('overlay-anim', 'out');
+  const t = setTimeout(() => {
+    hideTimers.delete(win.id);
+    if (!win.isDestroyed()) win.hide();
+  }, OVERLAY_OUT_MS);
+  hideTimers.set(win.id, t);
+}
+
+// ── Perfil ATAK.GG embebido ──────────────────────────────────────────────────
+// Clic en un jugador/campeón en cualquier vista → el frontend real de ATAK
+// dentro de la app (siempre la última versión desplegada — cero duplicación).
+// SIN preload: es contenido remoto y no debe ver window.atak.
+let atakWin: BrowserWindow | null = null;
+
+function openAtakPage(pagePath: string) {
+  const url = `${FRONTEND}${pagePath.startsWith('/') ? '' : '/'}${pagePath}`;
+  if (atakWin && !atakWin.isDestroyed()) {
+    void atakWin.loadURL(url);
+    if (atakWin.isMinimized()) atakWin.restore();
+    atakWin.show();
+    atakWin.focus();
+    return;
+  }
+  atakWin = new BrowserWindow({
+    width: 1360, height: 900, minWidth: 980, minHeight: 640,
+    backgroundColor: '#0a0a0c',
+    autoHideMenuBar: true,
+    title: 'ATAK.GG',
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  atakWin.on('closed', () => { atakWin = null; });
+  // Enlaces externos (Discord, etc.) al navegador del sistema; el resto navega dentro.
+  atakWin.webContents.setWindowOpenHandler(({ url: u }) => {
+    if (u.startsWith(FRONTEND)) return { action: 'allow' };
+    if (/^https?:\/\//.test(u)) void shell.openExternal(u);
+    return { action: 'deny' };
+  });
+  void atakWin.loadURL(url);
+}
+
+/** Región LCU ('LA1') → plataforma de la URL del frontend ('la1'). */
+function currentPlatform(): string {
+  return String(lcu.region || 'la1').toLowerCase();
+}
+
 function broadcast(channel: string, payload?: any) {
   for (const w of wins.values()) {
     if (!w.isDestroyed()) w.webContents.send(channel, payload);
@@ -153,11 +223,25 @@ function broadcast(channel: string, payload?: any) {
 // ── Máquina de estados por fase ──────────────────────────────────────────────
 let casterMode = false; // el Modo Caster mantiene su propia ventana/push
 
+// Modo OP.GG según la cola actual (LCU) o el modo vivo (Live Client):
+// runas/builds/picks se adaptan a ARAM/Arena; solo/flex comparten 'ranked'.
+function currentOpggMode(): OpggGameMode {
+  const qid = lcu.currentQueueId;
+  if (qid === 450 || qid === 3220) return 'aram';
+  if (qid === 1700 || qid === 1710 || qid === 1720) return 'arena';
+  const liveMode = String(live.state?.gameMode || '').toUpperCase();
+  if (liveMode === 'ARAM') return 'aram';
+  if (liveMode === 'CHERRY') return 'arena';
+  return 'ranked';
+}
+
 function handlePhase(phase: string) {
   broadcast('phase', phase);
   switch (phase) {
     case 'ChampSelect':
-      ensure('champselect');
+      // En modo caster no se auto-abre NINGÚN overlay in-game: la prioridad es
+      // la vista de espectador limpia. Los hotkeys siguen como override manual.
+      if (!casterMode) ensure('champselect');
       break;
     case 'InProgress':
     case 'GameStart':
@@ -269,10 +353,12 @@ async function emitChampionBuild(
     if (!champ) return;
     broadcast('champion-build-loading', { championId, name: champ.name, preview, rival: rivalName });
 
+    const mode = currentOpggMode();
     const [opgg, counters, matchup] = await Promise.all([
-      getChampionBuild(champ.name, position || 'MIDDLE'),
-      getCounters(champ.name, position || 'MIDDLE'),
-      rivalName ? getMatchup(champ.name, rivalName, position || 'MIDDLE') : Promise.resolve(null),
+      getChampionBuild(champ.name, position || 'MIDDLE', mode),
+      // Counters/matchup son conceptos de línea: solo aplican en la Grieta.
+      mode === 'ranked' ? getCounters(champ.name, position || 'MIDDLE') : Promise.resolve([]),
+      mode === 'ranked' && rivalName ? getMatchup(champ.name, rivalName, position || 'MIDDLE') : Promise.resolve(null),
     ]);
 
     // La página de runas del matchup solo se usa si OP.GG tiene muestra real;
@@ -471,6 +557,9 @@ lcu.on('eog-stats', (payloadIn: any) => {
     _meChampionName: lastMeChampionName,
     _mapNumber: lastMapNumber,
   };
+  // En modo caster no se auto-abre el post-partida: el caster va directo a la
+  // siguiente partida sin ventanas encima de la vista de espectador.
+  if (casterMode) return;
   ensure('eog');
   const w = wins.get('eog');
   w?.webContents.once('did-finish-load', () => w.webContents.send('eog-data', payload));
@@ -518,6 +607,13 @@ ipcMain.handle('patch-data', async () => await getPatchData());
 ipcMain.handle('caster-start', (_e, cfg: FeedConfig & { showOverlay?: boolean }) => {
   casterMode = true;
   feed.configure(cfg.token ? cfg : null);
+  // Prioridad total a la vista del caster: cerrar cualquier overlay in-game
+  // que ya estuviera abierto (se pueden reabrir a mano con los hotkeys).
+  closeWin('hud');
+  closeWin('scoreboard');
+  closeWin('players');
+  closeWin('champselect');
+  closeWin('eog');
   if (cfg.showOverlay) ensure('caster');
   return { ok: true };
 });
@@ -529,6 +625,20 @@ ipcMain.handle('caster-stop', () => {
 });
 ipcMain.on('open-external', (_e, url: string) => {
   if (/^https?:\/\//.test(String(url))) void shell.openExternal(url);
+});
+
+// ── Frontend ATAK embebido: perfil de jugador / página de campeón ────────────
+ipcMain.on('open-atak-profile', (_e, riotId: string, platform?: string) => {
+  const rid = String(riotId || '').trim();
+  if (!rid.includes('#')) return;
+  const pf = String(platform || currentPlatform()).toLowerCase();
+  openAtakPage(`/stats/${pf}/${encodeURIComponent(rid)}`);
+});
+ipcMain.on('open-atak', (_e, pagePath: string) => {
+  const p = String(pagePath || '');
+  // Solo rutas internas del frontend — nada de URLs arbitrarias.
+  if (!p.startsWith('/') || p.startsWith('//')) return;
+  openAtakPage(p);
 });
 ipcMain.on('win', (e, action: 'minimize' | 'close' | 'hide') => {
   const w = BrowserWindow.fromWebContents(e.sender);
@@ -569,7 +679,7 @@ ipcMain.handle('opgg-roster', async () => {
   );
   const me = players.find((p) => p.isMe) || players[0];
   const build = me
-    ? await getChampionBuild(me.championName, me.position || 'MIDDLE')
+    ? await getChampionBuild(me.championName, me.position || 'MIDDLE', currentOpggMode())
     : null;
   return {
     ok: true,
@@ -585,7 +695,7 @@ ipcMain.handle('opgg-roster', async () => {
 
 ipcMain.handle('opgg-build', async (_e, championName: string, position: string) => {
   if (!championName) return null;
-  return await getChampionBuild(String(championName), String(position || 'MIDDLE'));
+  return await getChampionBuild(String(championName), String(position || 'MIDDLE'), currentOpggMode());
 });
 
 /** Nombre de campeón → championId numérico usando el patch en memoria. */
@@ -690,13 +800,13 @@ function raisePlayersWindow(win: BrowserWindow) {
 function togglePlayersPanel(reason = 'hotkey') {
   const pw = wins.get('players');
   if (pw && !pw.isDestroyed()) {
-    if (pw.isVisible()) {
+    if (pw.isVisible() && !hideTimers.has(pw.id)) {
       console.log('[hotkey] players HIDE', reason);
-      pw.hide();
+      animatedHide(pw);
       return;
     }
     console.log('[hotkey] players SHOW', reason);
-    raisePlayersWindow(pw);
+    animatedShow(pw, raisePlayersWindow);
     return;
   }
   const phase = String(lcu.currentPhase || '');
@@ -720,6 +830,22 @@ ipcMain.handle('toggle-players', () => {
   return { ok: true, open: Boolean(wins.get('players') && !wins.get('players')!.isDestroyed()) };
 });
 
+// Toggle de cualquier overlay desde la UI (mismo camino animado que el hotkey):
+// para que TODO sea alcanzable con mouse aunque un hotkey falle.
+ipcMain.handle('toggle-overlay', (_e, kind: string) => {
+  if (kind === 'players') { togglePlayersPanel('ui'); return { ok: true }; }
+  if (kind !== 'hud' && kind !== 'scoreboard' && kind !== 'champselect') return { ok: false };
+  const existing = wins.get(kind as WinKind);
+  if (existing && !existing.isDestroyed()) {
+    existing.isVisible() && !hideTimers.has(existing.id)
+      ? animatedHide(existing)
+      : animatedShow(existing);
+  } else {
+    ensure(kind as WinKind);
+  }
+  return { ok: true };
+});
+
 // ── Ciclo de vida ────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   ensure('main');
@@ -732,41 +858,92 @@ app.whenReady().then(() => {
     return ok;
   };
 
-  // Hotkeys
-  bind('F9', () => {
-    const hud = wins.get('hud');
-    if (hud && !hud.isDestroyed()) { hud.isVisible() ? hud.hide() : hud.showInactive(); }
-    else if (live.state?.isActive || lcu.currentPhase === 'InProgress') ensure('hud');
-  });
-  bind('CommandOrControl+Shift+S', () => {
-    const sb = wins.get('scoreboard');
-    if (sb && !sb.isDestroyed()) closeWin('scoreboard');
-    else ensure('scoreboard');
-  });
+  // Los hotkeys llegan por DOS caminos (globalShortcut + hook de bajo nivel);
+  // este candado evita el doble toggle cuando ambos disparan a la vez.
+  const lastFire = new Map<string, number>();
+  const fire = (key: string, fn: () => void) => {
+    const now = Date.now();
+    if (now - (lastFire.get(key) || 0) < 250) return;
+    lastFire.set(key, now);
+    fn();
+  };
 
-  // F8 es el principal (como F9 HUD). League a veces come Ctrl+A.
-  // Si el juego está en "pantalla completa exclusiva", Windows puede bloquear
-  // hotkeys: usa borderless windowed en LoL. Con borderless + alwaysOnTop OK.
+  const toggleHud = () => {
+    const hud = wins.get('hud');
+    if (hud && !hud.isDestroyed()) {
+      hud.isVisible() && !hideTimers.has(hud.id) ? animatedHide(hud) : animatedShow(hud);
+    }
+    else if (live.state?.isActive || lcu.currentPhase === 'InProgress') ensure('hud');
+  };
+  const toggleScoreboard = () => {
+    const sb = wins.get('scoreboard');
+    if (sb && !sb.isDestroyed()) {
+      sb.isVisible() && !hideTimers.has(sb.id) ? animatedHide(sb) : animatedShow(sb);
+    } else {
+      ensure('scoreboard');
+    }
+  };
   const openPlayers = () => {
     console.log('[hotkey] F8/players fired');
     togglePlayersPanel('hotkey');
   };
-  bind('F8', openPlayers);
-  bind('F10', openPlayers);
-  bind('CommandOrControl+Shift+A', openPlayers);
-  bind('Alt+A', openPlayers);
-  // Re-registrar tras 3s por si otro proceso los soltó al arrancar.
-  setTimeout(() => {
-    for (const accel of ['F8', 'F10', 'CommandOrControl+Shift+A', 'Alt+A']) {
+
+  // Hotkeys clásicos (funcionan en escritorio y en el cliente de LoL)
+  bind('F9', () => fire('hud', toggleHud));
+  bind('CommandOrControl+Shift+S', () => fire('scoreboard', toggleScoreboard));
+
+  // F8 es el principal (como F9 HUD). Ctrl+A también, por petición popular —
+  // OJO: dentro de un chat/lobby Ctrl+A deja de "seleccionar todo" mientras el
+  // companion corre (globalShortcut es global). Si molesta, se quita.
+  const PLAYER_ACCELS = ['F8', 'F10', 'CommandOrControl+A', 'CommandOrControl+Shift+A', 'Alt+A'];
+  const bindPlayers = (why: string) => {
+    for (const accel of PLAYER_ACCELS) {
       try { globalShortcut.unregister(accel); } catch { /* */ }
-      bind(accel, openPlayers);
+      bind(accel, () => fire('players', openPlayers));
     }
-    console.log('[hotkey] players re-bound: F8 · F10 · Ctrl+Shift+A · Alt+A');
-  }, 3000);
-  console.log('[hotkey] players: F8 · F10 · Ctrl+Shift+A · Alt+A');
+    console.log(`[hotkey] players re-bound (${why}): ${PLAYER_ACCELS.join(' · ')}`);
+  };
+  bindPlayers('boot');
+  // Re-registrar tras 3s por si otro proceso los soltó al arrancar…
+  setTimeout(() => bindPlayers('boot+3s'), 3000);
+  live.on('game-started', () => setTimeout(() => bindPlayers('game-started'), 2000));
+  lcu.on('phase', (phase: string) => {
+    if (phase === 'InProgress' || phase === 'GameStart') {
+      setTimeout(() => bindPlayers(`phase:${phase}`), 2500);
+    }
+  });
+
+  // ── Hook de teclado de bajo nivel (uiohook) ────────────────────────────────
+  // El juego (League of Legends.exe) se come los globalShortcut de Electron —
+  // funcionaban en el cliente pero NO in-game. Este hook ve las teclas por
+  // debajo del juego. Solo actúa DENTRO de partida: fuera, los globalShortcut
+  // normales mandan y Ctrl+A sigue siendo "seleccionar todo" en otras apps.
+  // (En "pantalla completa exclusiva" el overlay no puede dibujarse encima de
+  // todos modos: recomendar modo "sin bordes" en el cliente.)
+  try {
+    const inGame = () =>
+      Boolean(live.state?.isActive)
+      || lcu.currentPhase === 'InProgress'
+      || lcu.currentPhase === 'GameStart';
+    uIOhook.on('keydown', (e) => {
+      if (!inGame()) return;
+      const { keycode, ctrlKey, shiftKey, altKey } = e;
+      if (keycode === UiohookKey.F8 || keycode === UiohookKey.F10) fire('players', openPlayers);
+      else if (keycode === UiohookKey.A && (ctrlKey || altKey)) fire('players', openPlayers);
+      else if (keycode === UiohookKey.F9) fire('hud', toggleHud);
+      else if (keycode === UiohookKey.S && ctrlKey && shiftKey) fire('scoreboard', toggleScoreboard);
+    });
+    uIOhook.start();
+    console.log('[hotkey-hook] uiohook activo — hotkeys garantizados dentro del juego');
+  } catch (e: any) {
+    console.error('[hotkey-hook] no arrancó (quedan solo los globalShortcut):', e?.message);
+  }
 });
 
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+  try { uIOhook.stop(); } catch { /* ya detenido */ }
+});
 app.on('window-all-closed', () => app.quit());
 
 // Evitar que se cierre la app al cerrar overlays (main puede estar oculta).

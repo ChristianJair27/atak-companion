@@ -7,6 +7,7 @@ import {
   SpellIcon,
   fmtClock,
   keystoneIconUrl,
+  openProfile,
   posEs,
   useLive,
   usePatch,
@@ -302,11 +303,16 @@ function PlayerCard({
       {/* Identidad + rank + form */}
       <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-          <span style={{
-            fontSize: 16, fontWeight: 700,
-            color: p.isMe ? '#c8aa6e' : '#fff',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
+          <span
+            className="atak-link no-drag"
+            onClick={() => openProfile(p.riotId)}
+            title={`Ver perfil de ${p.riotId} en ATAK.GG`}
+            style={{
+              fontSize: 16, fontWeight: 700,
+              color: p.isMe ? '#c8aa6e' : '#fff',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}
+          >
             {p.name || p.riotId}
           </span>
           {p.position && (

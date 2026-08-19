@@ -58,6 +58,10 @@ export class LcuService extends EventEmitter {
   extraLockfileDir: string | null = null;
   /** LP/rango capturado al entrar InProgress → delta en EOG. */
   rankedBeforeGame: RankedSnapshot | null = null;
+  /** Cola de la partida actual (420 solo, 440 flex, 450 aram…). */
+  currentQueueId: number | null = null;
+  /** queueType de ranked de ESTA partida (RANKED_SOLO_5x5 | RANKED_FLEX_SR | null). */
+  rankedQueueType: string | null = null;
 
   region: string | null = null; // p.ej. 'LA1'
   summoner: { gameName: string; tagLine: string; puuid: string } | null = null;
@@ -279,6 +283,14 @@ export class LcuService extends EventEmitter {
       if ((phase === 'InProgress' || phase === 'GameStart') && prev !== 'InProgress' && prev !== 'GameStart') {
         void this.snapshotRankedBeforeGame();
       }
+      // Cola detectada desde champ select: las sugerencias (runas/picks) se
+      // adaptan al modo (ranked/aram/arena) desde el primer segundo del draft.
+      if (phase === 'ChampSelect' && prev !== 'ChampSelect') {
+        void this.get<any>('/lol-gameflow/v1/session').then((s) => {
+          const qid = Number(s?.gameData?.queue?.id) || null;
+          if (qid) this.currentQueueId = qid;
+        });
+      }
       this.emit('phase', phase);
     }
 
@@ -300,34 +312,47 @@ export class LcuService extends EventEmitter {
     }
   }
 
-  /** Solo/Duo preferido; Flex si no hay solo. */
-  async getRankedSnapshot(): Promise<RankedSnapshot | null> {
+  /**
+   * Rango de UNA cola concreta. Sin queueType: Solo/Duo preferido, Flex de
+   * respaldo (comportamiento clásico para vistas genéricas).
+   * OJO: para el ΔLP del EOG SIEMPRE pedir la cola que se jugó — antes se
+   * mostraba SoloQ tras una flex y el delta salía 0.
+   */
+  async getRankedSnapshot(queueType?: string | null): Promise<RankedSnapshot | null> {
     const data = await this.get<any>('/lol-ranked/v1/current-ranked-stats');
     if (!data || data.errorCode) return null;
-    const qmap = data.queueMap || data.queues || {};
-    const solo =
-      qmap.RANKED_SOLO_5x5 ||
-      qmap['RANKED_SOLO_5x5'] ||
-      (Array.isArray(data.queues)
-        ? data.queues.find((q: any) => q.queueType === 'RANKED_SOLO_5x5')
-        : null) ||
-      qmap.RANKED_FLEX_SR ||
+    const qmap = data.queueMap || {};
+    const pick = (qt: string) =>
+      qmap[qt] ||
+      (Array.isArray(data.queues) ? data.queues.find((q: any) => q.queueType === qt) : null) ||
       null;
-    if (!solo) return null;
-    const tier = solo.tier && solo.tier !== 'NONE' && solo.tier !== 'UNRANKED' ? String(solo.tier) : null;
+    const entry = queueType
+      ? pick(queueType)
+      : (pick('RANKED_SOLO_5x5') || pick('RANKED_FLEX_SR'));
+    if (!entry) return null;
+    const tier = entry.tier && entry.tier !== 'NONE' && entry.tier !== 'UNRANKED' ? String(entry.tier) : null;
     return {
-      queue: String(solo.queueType || 'RANKED_SOLO_5x5'),
+      queue: String(entry.queueType || queueType || 'RANKED_SOLO_5x5'),
       tier,
-      division: solo.division ?? solo.rank ?? null,
-      lp: Number(solo.leaguePoints ?? solo.lp ?? 0) || 0,
-      wins: Number(solo.wins ?? 0) || 0,
-      losses: Number(solo.losses ?? 0) || 0,
+      division: entry.division ?? entry.rank ?? null,
+      lp: Number(entry.leaguePoints ?? entry.lp ?? 0) || 0,
+      wins: Number(entry.wins ?? 0) || 0,
+      losses: Number(entry.losses ?? 0) || 0,
     };
   }
 
   private async snapshotRankedBeforeGame() {
-    const snap = await this.getRankedSnapshot();
-    if (snap) this.rankedBeforeGame = snap;
+    // Cola real de la partida desde la sesión de gameflow.
+    const session = await this.get<any>('/lol-gameflow/v1/session');
+    const qid = Number(session?.gameData?.queue?.id) || null;
+    this.currentQueueId = qid;
+    this.rankedQueueType =
+      qid === 420 ? 'RANKED_SOLO_5x5'
+      : qid === 440 ? 'RANKED_FLEX_SR'
+      : null; // normales/ARAM/customs: sin LP → el EOG oculta el bloque
+    this.rankedBeforeGame = this.rankedQueueType
+      ? await this.getRankedSnapshot(this.rankedQueueType)
+      : null;
   }
 
   private async fetchRankedWithRetry(): Promise<{
@@ -335,12 +360,14 @@ export class LcuService extends EventEmitter {
     after: RankedSnapshot | null;
     lpDelta: number | null;
   }> {
+    // Partida sin LP (normal/ARAM/custom) → sin bloque de ranked en el EOG.
+    if (!this.rankedQueueType) return { before: null, after: null, lpDelta: null };
     const before = this.rankedBeforeGame;
-    let after = await this.getRankedSnapshot();
-    // A veces el LCU tarda en reflejar el LP; 2 reintentos cortos.
-    for (let i = 0; i < 2 && after && before && after.lp === before.lp; i++) {
-      await new Promise((r) => setTimeout(r, 1200));
-      after = await this.getRankedSnapshot();
+    let after = await this.getRankedSnapshot(this.rankedQueueType);
+    // A veces el LCU tarda en reflejar el LP; 3 reintentos cortos.
+    for (let i = 0; i < 3 && after && before && after.lp === before.lp; i++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      after = await this.getRankedSnapshot(this.rankedQueueType);
     }
     let lpDelta: number | null = null;
     if (before && after && before.tier && after.tier) {
