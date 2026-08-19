@@ -43,6 +43,9 @@
       "dist/**",
       "dist-electron/**"
     ],
+    "asarUnpack": [
+      "node_modules/uiohook-napi/**"
+    ],
     "win": {
       "target": "nsis",
       "artifactName": "ATAK-Companion-Setup-${version}.exe",
