@@ -20,7 +20,8 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron',
             // uiohook-napi es módulo nativo (.node): jamás bundlearlo.
-            rollupOptions: { external: ['electron', 'uiohook-napi'] },
+            // electron-updater usa require dinámicos: mejor externo.
+            rollupOptions: { external: ['electron', 'uiohook-napi', 'electron-updater'] },
           },
         },
       },

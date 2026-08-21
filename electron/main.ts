@@ -10,6 +10,10 @@
 //   resto            → solo la ventana principal
 import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell } from 'electron';
 import { uIOhook, UiohookKey } from 'uiohook-napi';
+// electron-updater es CJS: importar el default y desestructurar (los named
+// exports no siempre son analizables desde ESM).
+import electronUpdater from 'electron-updater';
+const { autoUpdater } = electronUpdater;
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LcuService } from './services/lcu.js';
@@ -648,10 +652,19 @@ ipcMain.on('win', (e, action: 'minimize' | 'close' | 'hide') => {
   else w.close();
 });
 
-// OP.GG MCP — roster de la partida viva + build del campeón local
+// OP.GG MCP — roster de la partida viva + build del campeón local.
+// CACHÉ DE PAYLOAD: el roster de una misma partida no cambia (mismos 10
+// jugadores/campeones), así que la respuesta completa se cachea por roster.
+// Reabrir el panel con F8 es instantáneo (antes cada apertura re-armaba
+// todo y se veían spinners); fuera de partida se sirve el último conocido.
+let rosterPayloadCache: { key: string; payload: any } | null = null;
 ipcMain.handle('opgg-roster', async () => {
   const state = live.state;
-  if (!state?.players?.length) return { ok: false, players: [], build: null };
+  if (!state?.players?.length) {
+    return rosterPayloadCache?.payload ?? { ok: false, players: [], build: null };
+  }
+  const rosterKey = state.players.map((p) => `${p.riotId}:${p.championName}`).join('|');
+  if (rosterPayloadCache?.key === rosterKey) return rosterPayloadCache.payload;
   const region = lcu.region || 'LA1';
   const players = state.players.map((p) => ({
     riotId: p.riotId,
@@ -681,7 +694,7 @@ ipcMain.handle('opgg-roster', async () => {
   const build = me
     ? await getChampionBuild(me.championName, me.position || 'MIDDLE', currentOpggMode())
     : null;
-  return {
+  const payload = {
     ok: true,
     region,
     gameTime: state.gameTime,
@@ -691,6 +704,8 @@ ipcMain.handle('opgg-roster', async () => {
     meChampion: me?.championName || null,
     mePosition: me?.position || null,
   };
+  rosterPayloadCache = { key: rosterKey, payload };
+  return payload;
 });
 
 ipcMain.handle('opgg-build', async (_e, championName: string, position: string) => {
@@ -868,7 +883,12 @@ app.whenReady().then(() => {
     fn();
   };
 
+  // Los hotkeys de overlays solo tienen sentido con LoL presente: sin cliente
+  // ni partida, no-op (antes Ctrl+A abría el panel escribiendo en Word).
+  const lolPresent = () => lcu.connected || Boolean(live.state?.isActive);
+
   const toggleHud = () => {
+    if (!lolPresent()) return;
     const hud = wins.get('hud');
     if (hud && !hud.isDestroyed()) {
       hud.isVisible() && !hideTimers.has(hud.id) ? animatedHide(hud) : animatedShow(hud);
@@ -876,6 +896,7 @@ app.whenReady().then(() => {
     else if (live.state?.isActive || lcu.currentPhase === 'InProgress') ensure('hud');
   };
   const toggleScoreboard = () => {
+    if (!lolPresent()) return;
     const sb = wins.get('scoreboard');
     if (sb && !sb.isDestroyed()) {
       sb.isVisible() && !hideTimers.has(sb.id) ? animatedHide(sb) : animatedShow(sb);
@@ -884,6 +905,7 @@ app.whenReady().then(() => {
     }
   };
   const openPlayers = () => {
+    if (!lolPresent()) return;
     console.log('[hotkey] F8/players fired');
     togglePlayersPanel('hotkey');
   };
@@ -892,10 +914,11 @@ app.whenReady().then(() => {
   bind('F9', () => fire('hud', toggleHud));
   bind('CommandOrControl+Shift+S', () => fire('scoreboard', toggleScoreboard));
 
-  // F8 es el principal (como F9 HUD). Ctrl+A también, por petición popular —
-  // OJO: dentro de un chat/lobby Ctrl+A deja de "seleccionar todo" mientras el
-  // companion corre (globalShortcut es global). Si molesta, se quita.
-  const PLAYER_ACCELS = ['F8', 'F10', 'CommandOrControl+A', 'CommandOrControl+Shift+A', 'Alt+A'];
+  // F8/F10 son los globales (teclas dedicadas, sin colisiones). Ctrl+A y
+  // variantes YA NO se registran globales — secuestraban "seleccionar todo"
+  // en cualquier app; ahora viven SOLO en el hook de bajo nivel, que actúa
+  // únicamente dentro de la partida.
+  const PLAYER_ACCELS = ['F8', 'F10'];
   const bindPlayers = (why: string) => {
     for (const accel of PLAYER_ACCELS) {
       try { globalShortcut.unregister(accel); } catch { /* */ }
@@ -920,6 +943,31 @@ app.whenReady().then(() => {
   // normales mandan y Ctrl+A sigue siendo "seleccionar todo" en otras apps.
   // (En "pantalla completa exclusiva" el overlay no puede dibujarse encima de
   // todos modos: recomendar modo "sin bordes" en el cliente.)
+  // ── Auto-actualización (GitHub Releases del repo atak-companion) ───────────
+  // Descarga en segundo plano y se instala al cerrar la app; sin repartir
+  // .exe a mano. Solo en la app empacada (en dev no aplica). Los assets del
+  // release necesitan: Setup.exe + .blockmap + latest.yml.
+  if (app.isPackaged) {
+    try {
+      autoUpdater.autoDownload = true;
+      autoUpdater.autoInstallOnAppQuit = true;
+      autoUpdater.on('update-available', (info) => {
+        console.log(`[updater] actualización disponible: v${info.version} — descargando…`);
+        broadcast('update-status', { state: 'downloading', version: info.version });
+      });
+      autoUpdater.on('update-downloaded', (info) => {
+        console.log(`[updater] v${info.version} descargada — se instala al cerrar la app`);
+        broadcast('update-status', { state: 'ready', version: info.version });
+      });
+      autoUpdater.on('error', (e) => console.warn('[updater] error:', e?.message));
+      void autoUpdater.checkForUpdatesAndNotify();
+      // Re-chequear cada 4h (sesiones largas de la app en bandeja).
+      setInterval(() => { void autoUpdater.checkForUpdatesAndNotify(); }, 4 * 3600_000);
+    } catch (e: any) {
+      console.warn('[updater] no arrancó:', e?.message);
+    }
+  }
+
   try {
     const inGame = () =>
       Boolean(live.state?.isActive)
