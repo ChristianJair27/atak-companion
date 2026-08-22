@@ -20,6 +20,7 @@ import { LcuService } from './services/lcu.js';
 import { LiveClientService, computeObjectives } from './services/live-client.js';
 import { FeedPusher, type FeedConfig } from './services/feed-push.js';
 import { getPatchData } from './services/patch.js';
+import { AugmentDetector } from './services/augment-detector.js';
 import {
   fetchRosterOpgg,
   getChampionBuild,
@@ -41,7 +42,7 @@ const live = new LiveClientService();
 const feed = new FeedPusher();
 
 // ── Ventanas ─────────────────────────────────────────────────────────────────
-type WinKind = 'main' | 'hud' | 'champselect' | 'scoreboard' | 'eog' | 'caster' | 'players' | 'augments';
+type WinKind = 'main' | 'hud' | 'champselect' | 'scoreboard' | 'eog' | 'caster' | 'players' | 'augments' | 'augbadges';
 const wins = new Map<WinKind, BrowserWindow>();
 
 /** Eventos live cacheados para la timeline 2D del EOG (sin Match-V5). */
@@ -149,6 +150,29 @@ function ensure(kind: WinKind): BrowserWindow {
     // salen al centro de la pantalla, así no las tapa. AlwaysOnTop como el HUD.
     case 'augments':
       return makeOverlayWindow('augments', { w: 400, h: 740, x: 16, y: 90, alwaysOnTop: true, resizable: true });
+    // Badges SOBRE las cards de augments: ventana fullscreen transparente que
+    // deja pasar TODOS los clics (el jugador clickea la card de League
+    // normalmente; nosotros solo pintamos encima).
+    case 'augbadges': {
+      const { width, height } = screen.getPrimaryDisplay().bounds;
+      const win = new BrowserWindow({
+        x: 0, y: 0, width, height,
+        frame: false, transparent: true, resizable: false, movable: false,
+        focusable: false, skipTaskbar: true, show: false,
+        webPreferences: {
+          preload: path.join(__dirname, 'preload.cjs'),
+          contextIsolation: true,
+          nodeIntegration: false,
+        },
+      });
+      win.setIgnoreMouseEvents(true, { forward: true });
+      win.setAlwaysOnTop(true, 'screen-saver', 1);
+      win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      win.on('closed', () => wins.delete('augbadges'));
+      loadView(win, 'augbadges');
+      wins.set('augbadges', win);
+      return win;
+    }
     case 'eog':
       return makeOverlayWindow('eog', {
         w: 1240, h: 860, center: true, alwaysOnTop: false, resizable: true, transparent: false,
@@ -265,6 +289,8 @@ function handlePhase(phase: string) {
       closeWin('players');
       closeWin('champselect');
       closeWin('augments');
+      augDetector.stop();
+      closeWin('augbadges');
       break;
     case 'None':
     case 'Lobby':
@@ -588,10 +614,27 @@ live.on('game-ended', () => {
   broadcast('game-ended');
   closeWin('players');
   closeWin('augments');
+  augDetector.stop();
+  closeWin('augbadges');
   if (casterMode) void 0; // el caster sigue esperando la siguiente partida
 });
-// Auto-abrir el panel de augments UNA vez por partida de ARAM (la primera
-// oferta de augments llega temprano); si el jugador lo cierra no se reabre.
+// Detector visual de la oferta de augments: identifica las 3 cards por sus
+// iconos (captura de pantalla + matching) y pinta badges tier/pick% encima.
+const augDetector = new AugmentDetector();
+augDetector.on('offers', (matches) => {
+  const w = wins.get('augbadges');
+  if (matches) {
+    const win = w && !w.isDestroyed() ? w : ensure('augbadges');
+    win.showInactive();
+    win.webContents.send('aug-offers', matches);
+  } else if (w && !w.isDestroyed()) {
+    w.webContents.send('aug-offers', null);
+    setTimeout(() => { if (!w.isDestroyed()) w.hide(); }, 250);
+  }
+});
+
+// Al detectar partida de ARAM: preparar huellas del pool (stats del campeón
+// propio incluidas) y arrancar la vigilancia visual. Una vez por partida.
 let augmentsAutoShown = false;
 live.on('state', (state) => {
   if (
@@ -601,7 +644,20 @@ live.on('state', (state) => {
     && (state?.players || []).some((p: any) => p.isMe && p.championName)
   ) {
     augmentsAutoShown = true;
-    ensure('augments');
+    void (async () => {
+      try {
+        const me = (state.players || []).find((p: any) => p.isMe);
+        const championId = await championIdByName(me?.championName || '');
+        const board = await getAramAugmentBoard(championId);
+        if (!board.length) { ensure('augments'); return; } // sin datos → panel F7 clásico
+        const n = await augDetector.prepare(board);
+        console.log(`[aug-detector] ${n} huellas de iconos listas — vigilando la oferta de augments`);
+        augDetector.start();
+      } catch (e: any) {
+        console.warn('[aug-detector] no arrancó:', e?.message);
+        ensure('augments');
+      }
+    })();
   }
   if (Array.isArray(state?.events)) lastLiveEvents = state.events;
   if (state?.mapNumber) lastMapNumber = Number(state.mapNumber) || 11;

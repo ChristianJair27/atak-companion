@@ -12,6 +12,7 @@ import PlayersView from './views/PlayersView';
 import EogView from './views/EogView';
 import CasterView from './views/CasterView';
 import AugmentsView from './views/AugmentsView';
+import AugBadgesView from './views/AugBadgesView';
 
 declare global {
   interface Window {
@@ -79,6 +80,7 @@ declare global {
       openProfile: (riotId: string, platform?: string) => void;
       openAtak: (pagePath: string) => void;
       onOverlayAnim: (fn: (dir: 'in' | 'out') => void) => () => void;
+      onAugOffers: (fn: (offers: any) => void) => () => void;
     };
   }
 }
@@ -126,6 +128,8 @@ export default function App() {
     case 'scoreboard': return <OverlayShell><ScoreboardView /></OverlayShell>;
     case 'players': return <OverlayShell><PlayersView /></OverlayShell>;
     case 'augments': return <OverlayShell><AugmentsView /></OverlayShell>;
+    // Badges sobre las cards: ventana transparente click-through — sin shell.
+    case 'augbadges': return <AugBadgesView />;
     case 'eog': return <OverlayShell><EogView /></OverlayShell>;
     case 'caster': return <CasterView />;
     default: return <MainView />;

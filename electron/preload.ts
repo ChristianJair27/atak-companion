@@ -68,4 +68,5 @@ contextBridge.exposeInMainWorld('atak', {
   openAtak: (pagePath: string) => ipcRenderer.send('open-atak', pagePath),
   // Animación de overlays (show/hide coreografiado desde el main)
   onOverlayAnim: on('overlay-anim'),
+  onAugOffers: on('aug-offers'),
 });
