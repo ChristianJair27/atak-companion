@@ -11,6 +11,7 @@ import { EventEmitter } from 'node:events';
 import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
 
 export type GameflowPhase =
   | 'None' | 'Lobby' | 'Matchmaking' | 'ReadyCheck' | 'ChampSelect'
@@ -31,11 +32,15 @@ const LOCKFILE_CANDIDATES = (): string[] => {
   const home = process.env.USERPROFILE || '';
   const fixed = [
     path.join(home, 'AppData', 'Local', 'Riot Games', 'League of Legends', 'lockfile'),
-    'C:\\Program Files\\Riot Games\\League of Legends\\lockfile',
-    'C:\\Program Files (x86)\\Riot Games\\League of Legends\\lockfile',
   ];
-  const drives = ['C', 'D', 'E', 'F', 'G'].map((d) => `${d}:\\Riot Games\\League of Legends\\lockfile`);
-  return [...drives, ...fixed];
+  const drives = ['C', 'D', 'E', 'F', 'G'];
+  const perDrive = drives.flatMap((d) => [
+    `${d}:\\Riot Games\\League of Legends\\lockfile`,
+    `${d}:\\Program Files\\Riot Games\\League of Legends\\lockfile`,
+    `${d}:\\Program Files (x86)\\Riot Games\\League of Legends\\lockfile`,
+    `${d}:\\Games\\Riot Games\\League of Legends\\lockfile`,
+  ]);
+  return [...perDrive, ...fixed];
 };
 
 export interface RankedSnapshot {
@@ -255,6 +260,42 @@ export class LcuService extends EventEmitter {
     return { ok: true };
   }
 
+  private probing = false;
+  private lastProbeAt = 0;
+
+  /**
+   * Descubrimiento por PROCESO: si el lockfile no aparece en las rutas
+   * conocidas (instalación en carpeta custom — el bug clásico de "la app
+   * abre pero no reconoce el juego" en otras PCs), leemos la línea de
+   * comandos de LeagueClientUx.exe, que trae puerto, token y ruta real.
+   * Es el mismo método que usan Blitz/Porofessor.
+   */
+  private probeProcess(): void {
+    if (this.probing || Date.now() - this.lastProbeAt < 10_000) return;
+    this.probing = true;
+    this.lastProbeAt = Date.now();
+    execFile('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      "(Get-CimInstance Win32_Process -Filter \"name='LeagueClientUx.exe'\").CommandLine",
+    ], { windowsHide: true, timeout: 8000 }, (err, stdout) => {
+      this.probing = false;
+      if (err || !stdout) return;
+      const cmd = String(stdout);
+      const port = cmd.match(/--app-port=["']?(\d+)/)?.[1];
+      const token = cmd.match(/--remoting-auth-token=["']?([\w-]+)/)?.[1];
+      // El arg completo viene entre comillas ("--install-directory=C:\..."):
+      // terminar en la comilla de cierre, el siguiente --flag o el fin.
+      const dir = cmd.match(/--install-directory=["']?([^"]+?)(?=["']|\s+--|\s*$)/)?.[1];
+      if (dir) this.extraLockfileDir = dir.trim();
+      if (port && token && !this.lockfile) {
+        this.lockfile = { port: Number(port), password: token, protocol: 'https' };
+        console.log(`[lcu] cliente encontrado por PROCESO (puerto ${port}${dir ? `, dir "${dir.trim()}"` : ''})`);
+        this.emit('connected');
+        void this.resolveIdentity();
+      }
+    });
+  }
+
   private async poll() {
     if (!this.lockfile) {
       this.lockfile = this.findLockfile();
@@ -262,6 +303,7 @@ export class LcuService extends EventEmitter {
         this.emit('connected');
         void this.resolveIdentity();
       } else {
+        this.probeProcess(); // instalación custom: buscar el proceso
         return; // cliente cerrado; seguimos esperando
       }
     }
