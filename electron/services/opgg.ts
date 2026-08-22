@@ -1084,3 +1084,103 @@ export async function fetchRosterOpgg(
   await Promise.all(Array.from({ length: Math.min(concurrency, players.length) }, () => worker()));
   return out;
 }
+
+// ── Augments de ARAM (stats OP.GG por campeón + iconos CommunityDragon) ──────
+// Para el overlay tipo Blitz/Porofessor: tier del augment CON tu campeón y
+// popularidad de pickeo de la comunidad. OP.GG expone lol_list_aram_augments
+// por champion_id; los iconos/rareza salen del JSON de arena de CDragon
+// (mismo pool de augments que ARAM).
+export interface AugmentBoardEntry {
+  id: number;
+  name: string;
+  desc: string;
+  /** Tier OP.GG: 1 = OP … 5 = flojo (0 = sin datos). */
+  tier: number;
+  /** % de pickeo de la comunidad con este campeón (0-100). */
+  pickRate: number;
+  /** Score de rendimiento OP.GG (mayor = mejor). */
+  performance: number;
+  /** 0 = plata, 1 = oro, 2 = prismático. */
+  rarity: number;
+  icon: string;
+}
+
+const CDRAGON_ARENA_JSON = 'https://raw.communitydragon.org/latest/cdragon/arena/es_mx.json';
+const CDRAGON_ARENA_FALLBACK = 'https://raw.communitydragon.org/latest/cdragon/arena/en_us.json';
+const CDRAGON_GAME_BASE = 'https://raw.communitydragon.org/latest/game/';
+
+type AugMetaEntry = { name: string; desc: string; rarity: number; icon: string };
+async function getAugmentMeta(): Promise<{ byId: Record<number, AugMetaEntry>; byName: Record<string, AugMetaEntry> }> {
+  const cached = cache.get('augmeta');
+  if (cached && cached.exp > Date.now()) return cached.data;
+  const byId: Record<number, AugMetaEntry> = {};
+  const byName: Record<string, AugMetaEntry> = {};
+  for (const url of [CDRAGON_ARENA_JSON, CDRAGON_ARENA_FALLBACK]) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data: any = await res.json();
+      for (const a of (Array.isArray(data?.augments) ? data.augments : [])) {
+        const id = Number(a.id);
+        if (!id) continue;
+        const iconPath = String(a.iconLarge || a.iconSmall || '').toLowerCase();
+        const entry: AugMetaEntry = {
+          name: String(a.name ?? ''),
+          desc: String(a.desc ?? '').replace(/<[^>]+>/g, '').replace(/@[^@]+@/g, '?'),
+          rarity: Number(a.rarity) || 0,
+          icon: iconPath ? CDRAGON_GAME_BASE + iconPath : '',
+        };
+        byId[id] = entry;
+        byName[entry.name.toLowerCase().replace(/[^a-z0-9]/g, '')] = entry;
+      }
+      if (Object.keys(byId).length) break;
+    } catch { /* siguiente fuente */ }
+  }
+  // Meta cambia poco: cache largo (24h) aunque venga vacío no reintenta en loop.
+  const out = { byId, byName };
+  cache.set('augmeta', { data: out, exp: Date.now() + 24 * 3600_000 });
+  return out;
+}
+
+export async function getAramAugmentBoard(championId: number): Promise<AugmentBoardEntry[]> {
+  if (!championId) return [];
+  const cacheKey = `aramaug:${championId}`;
+  const cached = cache.get(cacheKey);
+  if (cached && cached.exp > Date.now()) return cached.data as AugmentBoardEntry[];
+
+  const [statsRes, meta] = await Promise.all([
+    callTool('lol_list_aram_augments', { champion_id: championId }).catch((e) => {
+      console.warn('[opgg] aram augments falló:', e?.message);
+      return null;
+    }),
+    getAugmentMeta(),
+  ]);
+  const augs: any[] = Array.isArray(statsRes?.data?.augments) ? statsRes.data.augments : [];
+  const out: AugmentBoardEntry[] = augs
+    .map((a: any) => {
+      const id = Number(a.id);
+      const name = String(a.name ?? '');
+      // OP.GG numera los augments de ARAM como cdragonId + 1000 (verificado:
+      // 1004→4 Back To Basics, 1116→116 Flashy); los 2xxx son exclusivos de
+      // ARAM sin entrada en el JSON de arena → fallback por nombre.
+      const m = meta.byId[id - 1000]
+        ?? meta.byName[name.toLowerCase().replace(/[^a-z0-9]/g, '')]
+        ?? null;
+      return {
+        id,
+        name: name || m?.name || '',
+        desc: String(a.desc ?? m?.desc ?? '').replace(/<[^>]+>/g, '').replace(/@[^@]+@/g, '?'),
+        tier: Number(a.tier) || 0,
+        // `popular` viene como fracción (0.2 = 20% de pickeo).
+        pickRate: Math.round((Number(a.popular) || 0) * 1000) / 10,
+        performance: Math.round((Number(a.performance) || 0) * 10) / 10,
+        rarity: m?.rarity ?? 0,
+        icon: m?.icon ?? '',
+      };
+    })
+    .filter((a) => a.id && a.name);
+  // Mejor tier primero; a igual tier, más pickeado primero.
+  out.sort((x, y) => (x.tier || 9) - (y.tier || 9) || y.pickRate - x.pickRate);
+  cache.set(cacheKey, { data: out, exp: Date.now() + CACHE_TTL });
+  return out;
+}

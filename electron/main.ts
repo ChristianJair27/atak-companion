@@ -26,6 +26,7 @@ import {
   getCounters,
   getMatchup,
   getPickSuggestions,
+  getAramAugmentBoard,
   RUNE_PATH_NAMES,
   type OpggGameMode,
 } from './services/opgg.js';
@@ -40,7 +41,7 @@ const live = new LiveClientService();
 const feed = new FeedPusher();
 
 // ── Ventanas ─────────────────────────────────────────────────────────────────
-type WinKind = 'main' | 'hud' | 'champselect' | 'scoreboard' | 'eog' | 'caster' | 'players';
+type WinKind = 'main' | 'hud' | 'champselect' | 'scoreboard' | 'eog' | 'caster' | 'players' | 'augments';
 const wins = new Map<WinKind, BrowserWindow>();
 
 /** Eventos live cacheados para la timeline 2D del EOG (sin Match-V5). */
@@ -144,6 +145,10 @@ function ensure(kind: WinKind): BrowserWindow {
         w: 1480, h: 900, center: true, alwaysOnTop: true, resizable: true, transparent: false,
       });
     case 'caster': return makeOverlayWindow('caster', { w: 1920, h: 1080, x: 0, y: 0, alwaysOnTop: true, resizable: false });
+    // Augments ARAM (F7): panel lateral IZQUIERDO — las cards de augments
+    // salen al centro de la pantalla, así no las tapa. AlwaysOnTop como el HUD.
+    case 'augments':
+      return makeOverlayWindow('augments', { w: 400, h: 740, x: 16, y: 90, alwaysOnTop: true, resizable: true });
     case 'eog':
       return makeOverlayWindow('eog', {
         w: 1240, h: 860, center: true, alwaysOnTop: false, resizable: true, transparent: false,
@@ -259,6 +264,7 @@ function handlePhase(phase: string) {
       closeWin('scoreboard');
       closeWin('players');
       closeWin('champselect');
+      closeWin('augments');
       break;
     case 'None':
     case 'Lobby':
@@ -272,6 +278,7 @@ function handlePhase(phase: string) {
         closeWin('hud');
         closeWin('scoreboard');
         closeWin('players');
+        closeWin('augments');
       }
       break;
   }
@@ -574,14 +581,28 @@ live.on('game-started', () => {
   lastLiveEvents = [];
   lastMeSkinId = 0;
   lastMeChampionName = '';
+  augmentsAutoShown = false;
   broadcast('game-started');
 });
 live.on('game-ended', () => {
   broadcast('game-ended');
   closeWin('players');
+  closeWin('augments');
   if (casterMode) void 0; // el caster sigue esperando la siguiente partida
 });
+// Auto-abrir el panel de augments UNA vez por partida de ARAM (la primera
+// oferta de augments llega temprano); si el jugador lo cierra no se reabre.
+let augmentsAutoShown = false;
 live.on('state', (state) => {
+  if (
+    !augmentsAutoShown && !casterMode
+    && state?.isActive
+    && String(state?.gameMode || '').toUpperCase() === 'ARAM'
+    && (state?.players || []).some((p: any) => p.isMe && p.championName)
+  ) {
+    augmentsAutoShown = true;
+    ensure('augments');
+  }
   if (Array.isArray(state?.events)) lastLiveEvents = state.events;
   if (state?.mapNumber) lastMapNumber = Number(state.mapNumber) || 11;
   const me = (state?.players || []).find((p: any) => p.isMe);
@@ -711,6 +732,17 @@ ipcMain.handle('opgg-roster', async () => {
 ipcMain.handle('opgg-build', async (_e, championName: string, position: string) => {
   if (!championName) return null;
   return await getChampionBuild(String(championName), String(position || 'MIDDLE'), currentOpggMode());
+});
+
+// Augments de ARAM para MI campeón: tier + pick rate de la comunidad (OP.GG)
+// con iconos/rareza de CDragon. Cache 30 min por campeón en el servicio.
+ipcMain.handle('aram-augments', async () => {
+  const me = (live.state?.players || []).find((p: any) => p.isMe);
+  const championName = me?.championName || lastMeChampionName;
+  if (!championName) return { ok: false, championName: null, augments: [] };
+  const championId = await championIdByName(championName);
+  const augments = await getAramAugmentBoard(championId);
+  return { ok: augments.length > 0, championName, championId, augments };
 });
 
 /** Nombre de campeón → championId numérico usando el patch en memoria. */
@@ -849,7 +881,7 @@ ipcMain.handle('toggle-players', () => {
 // para que TODO sea alcanzable con mouse aunque un hotkey falle.
 ipcMain.handle('toggle-overlay', (_e, kind: string) => {
   if (kind === 'players') { togglePlayersPanel('ui'); return { ok: true }; }
-  if (kind !== 'hud' && kind !== 'scoreboard' && kind !== 'champselect') return { ok: false };
+  if (kind !== 'hud' && kind !== 'scoreboard' && kind !== 'champselect' && kind !== 'augments') return { ok: false };
   const existing = wins.get(kind as WinKind);
   if (existing && !existing.isDestroyed()) {
     existing.isVisible() && !hideTimers.has(existing.id)
@@ -910,8 +942,20 @@ app.whenReady().then(() => {
     togglePlayersPanel('hotkey');
   };
 
+  // F7: panel de augments (ARAM) — tier + pick rate del campeón propio.
+  const toggleAugments = () => {
+    if (!lolPresent()) return;
+    const aw = wins.get('augments');
+    if (aw && !aw.isDestroyed()) {
+      aw.isVisible() && !hideTimers.has(aw.id) ? animatedHide(aw) : animatedShow(aw);
+    } else {
+      ensure('augments');
+    }
+  };
+
   // Hotkeys clásicos (funcionan en escritorio y en el cliente de LoL)
   bind('F9', () => fire('hud', toggleHud));
+  bind('F7', () => fire('augments', toggleAugments));
   bind('CommandOrControl+Shift+S', () => fire('scoreboard', toggleScoreboard));
 
   // F8/F10 son los globales (teclas dedicadas, sin colisiones). Ctrl+A y
@@ -979,6 +1023,7 @@ app.whenReady().then(() => {
       if (keycode === UiohookKey.F8 || keycode === UiohookKey.F10) fire('players', openPlayers);
       else if (keycode === UiohookKey.A && (ctrlKey || altKey)) fire('players', openPlayers);
       else if (keycode === UiohookKey.F9) fire('hud', toggleHud);
+      else if (keycode === UiohookKey.F7) fire('augments', toggleAugments);
       else if (keycode === UiohookKey.S && ctrlKey && shiftKey) fire('scoreboard', toggleScoreboard);
     });
     uIOhook.start();

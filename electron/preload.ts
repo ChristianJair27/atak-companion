@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('atak', {
   casterStop: () => ipcRenderer.invoke('caster-stop'),
   // OP.GG MCP (elo / WR / build / runas / sugerencias)
   opggRoster: () => ipcRenderer.invoke('opgg-roster'),
+  aramAugments: () => ipcRenderer.invoke('aram-augments'),
   opggBuild: (championName: string, position: string) =>
     ipcRenderer.invoke('opgg-build', championName, position),
   championPreview: (championName: string, position: string, rival?: string) =>

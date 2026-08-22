@@ -1,7 +1,7 @@
 {
   "name": "atak-companion",
   "productName": "ATAK Companion",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Companion de escritorio de ATAK.GG: overlay in-game, champ select, scoreboard y modo caster LQC. Electron puro (sin Overwolf).",
   "private": true,
   "type": "module",

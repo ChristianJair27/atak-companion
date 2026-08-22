@@ -11,6 +11,7 @@ import ScoreboardView from './views/ScoreboardView';
 import PlayersView from './views/PlayersView';
 import EogView from './views/EogView';
 import CasterView from './views/CasterView';
+import AugmentsView from './views/AugmentsView';
 
 declare global {
   interface Window {
@@ -33,6 +34,7 @@ declare global {
       casterStart: (cfg: any) => Promise<any>;
       casterStop: () => Promise<any>;
       opggRoster: () => Promise<any>;
+      aramAugments: () => Promise<any>;
       opggBuild: (championName: string, position: string) => Promise<any>;
       championPreview: (
         championName: string,
@@ -123,6 +125,7 @@ export default function App() {
     case 'champselect': return <OverlayShell><ChampSelectView /></OverlayShell>;
     case 'scoreboard': return <OverlayShell><ScoreboardView /></OverlayShell>;
     case 'players': return <OverlayShell><PlayersView /></OverlayShell>;
+    case 'augments': return <OverlayShell><AugmentsView /></OverlayShell>;
     case 'eog': return <OverlayShell><EogView /></OverlayShell>;
     case 'caster': return <CasterView />;
     default: return <MainView />;
