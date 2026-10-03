@@ -3,7 +3,7 @@
 // negro #0A0A0C. Las vistas viven en src/views/* y consumen los datos reales de
 // la capa Electron vía window.atak (declarado abajo).
 import { useEffect, useState, type ReactNode } from 'react';
-import { motion } from 'framer-motion';
+import { MotionConfig, motion } from 'framer-motion';
 import MainView from './views/MainView';
 import HudView from './views/HudView';
 import ChampSelectView from './views/ChampSelectView';
@@ -37,6 +37,11 @@ declare global {
       opggRoster: () => Promise<any>;
       aramAugments: () => Promise<any>;
       opggBuild: (championName: string, position: string) => Promise<any>;
+      draftAnalyze: (req: import('./views/DraftAiPanel').DraftAiRequest) => Promise<import('./views/DraftAiPanel').DraftAnalysis | null>;
+      draftAiNames: () => Promise<{ items: Record<number, string>; runes: Record<number, string> }>;
+      champMeta: (championName: string, position: string) => Promise<{
+        winRate: number | null; pickRate: number | null; banRate: number | null; tier: number | null; rank: number | null;
+      } | null>;
       championPreview: (
         championName: string,
         position: string,
@@ -75,6 +80,7 @@ declare global {
       }>>;
       togglePlayers: () => Promise<{ ok: boolean; open: boolean }>;
       toggleOverlay: (kind: 'hud' | 'scoreboard' | 'players' | 'champselect') => Promise<{ ok: boolean }>;
+      showOverlay: (kind: 'hud' | 'champselect') => Promise<{ ok: boolean }>;
       openExternal: (url: string) => void;
       win: (a: 'minimize' | 'close' | 'hide') => void;
       openProfile: (riotId: string, platform?: string) => void;
@@ -109,7 +115,13 @@ function OverlayShell({ children, origin = 'center' }: { children: ReactNode; or
   );
 }
 
+// reducedMotion="user": con prefers-reduced-motion framer anula transform/layout
+// y deja solo opacity en TODAS las vistas.
 export default function App() {
+  return <MotionConfig reducedMotion="user"><Views /></MotionConfig>;
+}
+
+function Views() {
   // Guard anti-pantalla-negra: si el preload no cargó (window.atak ausente),
   // mostrar el error en vez de tronar en silencio.
   if (!window.atak) {

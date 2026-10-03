@@ -16,12 +16,17 @@ const MATCH_MARGIN = 0.03;
 // Geometría RELATIVA de las 3 cards de augments (fracciones del tamaño de
 // pantalla, medidas para el layout estándar 16:9). El icono grande vive en la
 // parte alta de cada card. CALIBRABLE con un screenshot del usuario.
-export const CARD_GEOM = {
-  xs: [0.335, 0.5, 0.665],  // centros horizontales de las 3 cards
-  iconY: 0.365,             // centro vertical del icono
-  iconSize: 0.105,          // lado del icono como fracción de la ALTURA
-  badgeY: 0.245,            // dónde flota el badge (sobre la card)
-};
+export interface CardGeom {
+  xs: number[];     // centros horizontales de las 3 cards
+  iconY: number;    // centro vertical del icono
+  iconSize: number; // lado del icono como fracción de la ALTURA
+  badgeY: number;   // dónde flota el badge (sobre la card)
+}
+export const CARD_GEOM: CardGeom = { xs: [0.335, 0.5, 0.665], iconY: 0.365, iconSize: 0.105, badgeY: 0.245 };
+// Arena (CHERRY): las cards son más grandes y están más separadas. Estimado a
+// partir de una captura 2560×1440 del usuario; CALIBRAR si el match no entra
+// (subir el log de `score` en tick()).
+export const CARD_GEOM_ARENA: CardGeom = { xs: [0.316, 0.5, 0.684], iconY: 0.29, iconSize: 0.13, badgeY: 0.15 };
 
 function grayVector(img: Electron.NativeImage): Float32Array | null {
   const resized = img.resize({ width: HASH_SIZE, height: HASH_SIZE, quality: 'good' });
@@ -63,6 +68,7 @@ export class AugmentDetector extends EventEmitter {
   private timer: ReturnType<typeof setInterval> | null = null;
   private busy = false;
   private lastKey = '';
+  private geom: CardGeom = CARD_GEOM;
 
   /** Pre-computa las huellas de los iconos del pool (una vez por partida). */
   async prepare(board: AugmentBoardEntry[]): Promise<number> {
@@ -82,8 +88,9 @@ export class AugmentDetector extends EventEmitter {
     return this.hashes.size;
   }
 
-  start(intervalMs = 1800) {
+  start(intervalMs = 1800, geom: CardGeom = CARD_GEOM) {
     if (this.timer) return;
+    this.geom = geom;
     this.timer = setInterval(() => { void this.tick(); }, intervalMs);
   }
 
@@ -107,11 +114,12 @@ export class AugmentDetector extends EventEmitter {
       if (!shot || shot.isEmpty()) return;
       const size = shot.getSize();
 
-      const iconPx = Math.round(CARD_GEOM.iconSize * size.height);
+      const geom = this.geom;
+      const iconPx = Math.round(geom.iconSize * size.height);
       const matches: OfferMatch[] = [];
-      for (let slot = 0; slot < CARD_GEOM.xs.length; slot++) {
-        const cx = Math.round(CARD_GEOM.xs[slot] * size.width);
-        const cy = Math.round(CARD_GEOM.iconY * size.height);
+      for (let slot = 0; slot < geom.xs.length; slot++) {
+        const cx = Math.round(geom.xs[slot] * size.width);
+        const cy = Math.round(geom.iconY * size.height);
         const crop = shot.crop({
           x: Math.max(0, cx - iconPx / 2),
           y: Math.max(0, cy - iconPx / 2),
@@ -130,8 +138,8 @@ export class AugmentDetector extends EventEmitter {
         if (best && best.d <= MATCH_THRESHOLD && second - best.d >= MATCH_MARGIN) {
           matches.push({
             slot,
-            x: CARD_GEOM.xs[slot],
-            y: CARD_GEOM.badgeY,
+            x: geom.xs[slot],
+            y: geom.badgeY,
             augment: best.entry,
             score: Math.round(best.d * 1000) / 1000,
           });

@@ -1,7 +1,7 @@
 {
   "name": "atak-companion",
   "productName": "ATAK Companion",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Companion de escritorio de ATAK.GG: overlay in-game, champ select, scoreboard y modo caster LQC. Electron puro (sin Overwolf).",
   "private": true,
   "type": "module",
@@ -11,7 +11,8 @@
     "build": "tsc -p tsconfig.electron.json --noEmit && vite build && electron-builder",
     "build:web": "vite build",
     "typecheck": "tsc -p tsconfig.electron.json --noEmit && tsc -p tsconfig.json --noEmit",
-    "start": "electron ."
+    "start": "electron .",
+    "ai:setup": "ollama create atak-coach -f ollama/Modelfile"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

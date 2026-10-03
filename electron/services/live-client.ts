@@ -118,7 +118,7 @@ export class LiveClientService extends EventEmitter {
         // Preferir el token canónico "SummonerFlash" del rawDescription
         // (el displayName en clientes ES sale "Destello" y rompe el icono).
         const raw = String(slot.rawDescription || slot.rawDisplayName || '');
-        const m = raw.match(/Summoner[A-Za-z]+/);
+        const m = raw.match(/Summoner(?!Spell)[A-Za-z]+/);
         if (m) return m[0];
         if (typeof slot.key === 'number' && slot.key > 0) return slot.key;
         if (typeof slot.key === 'string' && slot.key.startsWith('Summoner')) return slot.key;

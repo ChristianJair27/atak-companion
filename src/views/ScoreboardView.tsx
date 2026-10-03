@@ -1,6 +1,8 @@
 // src/views/ScoreboardView.tsx — Scoreboard overlay 820×460 (diseño 1c).
 // Dos columnas espejo (azul/rojo) con marcador de kills; fondo transparente.
+import { motion } from 'framer-motion';
 import logo from '../assets/atak-logo.png';
+import { Blip, EASE, Rise, Stagger, staggerParent } from '../motion';
 import { ChampIcon, fmtClock, openProfile, useLive, usePatch } from './shared';
 
 export default function ScoreboardView() {
@@ -12,6 +14,15 @@ export default function ScoreboardView() {
   const blue = (s.players || []).filter((p: any) => p.team === 'ORDER');
   const red = (s.players || []).filter((p: any) => p.team !== 'ORDER');
   const sum = (arr: any[], k: string) => arr.reduce((a, p) => a + (p[k] || 0), 0);
+
+  // Fila: entra con stagger (una vez) y se atenúa con fade al morir.
+  const rowMotion = (p: any, fromX: number) => ({
+    variants: {
+      hidden: { opacity: 0, x: fromX },
+      show: { opacity: p.isDead ? 0.45 : 1, x: 0 },
+    },
+    transition: { duration: 0.3, ease: EASE },
+  });
 
   const kdaCell = (p: any) =>
     p.isDead
@@ -33,12 +44,12 @@ export default function ScoreboardView() {
   );
 
   const blueRow = (p: any, i: number) => (
-    <div
+    <motion.div
       key={i}
+      {...rowMotion(p, -8)}
       style={{
         display: 'grid', gridTemplateColumns: '30px 1fr 34px 64px 40px', gap: 8, alignItems: 'center',
         background: 'rgba(255,255,255,.04)', borderLeft: '2px solid #6f7480', padding: '7px 4px',
-        opacity: p.isDead ? 0.45 : 1,
       }}
     >
       <ChampIcon patch={patch} name={p.championName} size={26} />
@@ -46,16 +57,16 @@ export default function ScoreboardView() {
       <span style={{ font: '500 12px var(--font-data)', textAlign: 'center', color: 'var(--text-dim)' }}>{p.level}</span>
       {kdaCell(p)}
       <span style={{ font: '500 12px var(--font-data)', textAlign: 'right', color: 'var(--text-dim)' }}>{p.creepScore}</span>
-    </div>
+    </motion.div>
   );
 
   const redRow = (p: any, i: number) => (
-    <div
+    <motion.div
       key={i}
+      {...rowMotion(p, 8)}
       style={{
         display: 'grid', gridTemplateColumns: '40px 64px 34px 1fr 30px', gap: 8, alignItems: 'center',
         background: 'rgba(225,36,46,.05)', borderRight: '2px solid var(--crimson)', padding: '7px 4px',
-        opacity: p.isDead ? 0.45 : 1,
       }}
     >
       <span style={{ font: '500 12px var(--font-data)', color: 'var(--text-dim)' }}>{p.creepScore}</span>
@@ -63,23 +74,23 @@ export default function ScoreboardView() {
       <span style={{ font: '500 12px var(--font-data)', textAlign: 'center', color: 'var(--text-dim)' }}>{p.level}</span>
       {nameCell(p, true)}
       <ChampIcon patch={patch} name={p.championName} size={26} enemy />
-    </div>
+    </motion.div>
   );
 
   return (
     <div style={{ position: 'fixed', inset: '16px 20px' }}>
-      <div className="panel cut cut-lg" style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '12px 16px' }}>
+      <Stagger className="panel cut cut-lg" style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '12px 16px' }}>
         {/* Marcador */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, paddingBottom: 10 }}>
+        <Rise style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, paddingBottom: 10 }}>
           <span className="display" style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.16em', color: 'var(--text-soft)' }}>LADO AZUL</span>
-          <span className="metal-text-bright" style={{ fontWeight: 800, fontSize: 30, letterSpacing: '0.05em' }}>{sum(blue, 'kills')}</span>
+          <Blip className="metal-text-bright" style={{ fontWeight: 800, fontSize: 30, letterSpacing: '0.05em' }} value={sum(blue, 'kills')} />
           <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
             <img src={logo} alt="ATAK.GG" style={{ height: 34, filter: 'drop-shadow(0 0 6px rgba(225,36,46,.45))' }} />
             <span className="mono" style={{ fontWeight: 700, fontSize: 11, color: 'var(--text-soft)' }}>{fmtClock(s.gameTime)}</span>
           </span>
-          <span className="display" style={{ fontWeight: 800, fontSize: 30, letterSpacing: '0.05em', color: 'var(--crimson)' }}>{sum(red, 'kills')}</span>
+          <Blip className="display" style={{ fontWeight: 800, fontSize: 30, letterSpacing: '0.05em', color: 'var(--crimson)' }} value={sum(red, 'kills')} />
           <span className="display" style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.16em', color: 'var(--crimson)' }}>LADO ROJO</span>
-        </div>
+        </Rise>
         <div className="hr" style={{ marginBottom: 8 }} />
 
         {/* Encabezados */}
@@ -94,12 +105,12 @@ export default function ScoreboardView() {
 
         {/* Filas */}
         <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, minHeight: 0 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 5 }}>
+          <motion.div variants={staggerParent(0.04)} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 5 }}>
             {blue.map(blueRow)}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 5 }}>
+          </motion.div>
+          <motion.div variants={staggerParent(0.04)} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 5 }}>
             {red.map(redRow)}
-          </div>
+          </motion.div>
         </div>
 
         {/* Totales */}
@@ -110,7 +121,7 @@ export default function ScoreboardView() {
           <span>VISIÓN <span style={{ color: 'var(--crimson-soft)' }}>{sum(red, 'wardScore')}</span></span>
           <span>CS <span style={{ color: 'var(--crimson-soft)' }}>{sum(red, 'creepScore')}</span></span>
         </div>
-      </div>
+      </Stagger>
     </div>
   );
 }

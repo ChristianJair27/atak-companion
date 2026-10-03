@@ -60,3 +60,10 @@ Electron 31 · Vite 5 · React 18 · TypeScript · three.js
 ## Aviso
 
 ATAK Companion no está avalado por Riot Games y no refleja los puntos de vista u opiniones de Riot Games ni de nadie oficialmente involucrado en producir o administrar League of Legends. League of Legends y Riot Games son marcas registradas de Riot Games, Inc.
+
+## 0.3.0 — piel hextech, motion y ATAK Coach
+
+- Rediseño "cliente de League" en home, champ select, HUD (320×420), panel F8, herramienta de draft y post-partida, con motion cinematográfico (`src/motion.tsx`, `src/views/hextech.*`).
+- **ATAK Coach**: análisis IA del draft (champ select real y herramienta de draft) con runas, build de 6 items, situacionales y plan para ESA partida. Proveedores: Claude (`ANTHROPIC_API_KEY`) → Ollama local (`npm run ai:setup` crea `atak-coach` sobre qwen3:8b) → IA hosteada de ATAK → reglas + OP.GG. Ver `ollama/README.md`.
+- Builds completas con variantes y alternativas por slot (OP.GG), rango de los 10 jugadores en el post-partida, datos de Riot (rango, maestría, hechizos) por celda en el draft, barras de pickeo sobre los augments (ARAM/Arena).
+- Preview en navegador sin LoL: `npx vite --config vite.preview.config.ts` → `http://localhost:5178/preview/?view=champselect`.

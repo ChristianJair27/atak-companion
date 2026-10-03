@@ -199,7 +199,7 @@ export const spellIconUrl = (patch: PatchInfo | null, spell: number | string): s
     name = SPELL_ID_TO_NAME[spell] || '';
   } else {
     const s = String(spell);
-    const m = s.match(/Summoner[A-Za-z]+/);
+    const m = s.match(/Summoner(?!Spell)[A-Za-z]+/);
     if (m) name = m[0];
     else if (s.startsWith('Summoner')) name = s.replace(/_Description.*$/, '').split('_')[0] || s;
     if (!name.startsWith('Summoner')) name = SPELL_NAME_BY_LABEL[norm(s)] || '';
@@ -331,7 +331,19 @@ export function SpellIcon(props: { patch: PatchInfo | null; spell: number | stri
   );
 }
 
-const TIER_COLOR: Record<string, string> = {
+export const TIER_ES: Record<string, string> = {
+  IRON: 'Hierro', BRONZE: 'Bronce', SILVER: 'Plata', GOLD: 'Oro', PLATINUM: 'Platino', EMERALD: 'Esmeralda',
+  DIAMOND: 'Diamante', MASTER: 'Maestro', GRANDMASTER: 'Gran Maestro', CHALLENGER: 'Retador',
+};
+export const TIER_ORDER = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'];
+/** "Esmeralda II · 64 LP" a partir de un snapshot de ranked (null → "Sin rango"). */
+export const rankLabel = (r?: { tier?: string | null; division?: string | number | null; lp?: number | null } | null): string => {
+  if (!r?.tier) return 'Sin rango';
+  const t = String(r.tier).toUpperCase();
+  const div = r.division && String(r.division) !== 'NA' && String(r.division) !== 'null' ? ` ${r.division}` : '';
+  return `${TIER_ES[t] || r.tier}${div}${r.lp != null ? ` · ${r.lp} LP` : ''}`;
+};
+export const TIER_COLOR: Record<string, string> = {
   IRON: '#8a8a8a', BRONZE: '#a97142', SILVER: '#b8c4c4', GOLD: '#e8c063',
   PLATINUM: '#4fd1c5', EMERALD: '#2ecc71', DIAMOND: '#7fb8ff',
   MASTER: '#c084fc', GRANDMASTER: '#ef4444', CHALLENGER: '#facc15',

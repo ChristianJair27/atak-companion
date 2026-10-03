@@ -20,7 +20,8 @@ import { LcuService } from './services/lcu.js';
 import { LiveClientService, computeObjectives } from './services/live-client.js';
 import { FeedPusher, type FeedConfig } from './services/feed-push.js';
 import { getPatchData } from './services/patch.js';
-import { AugmentDetector } from './services/augment-detector.js';
+import { AugmentDetector, CARD_GEOM, CARD_GEOM_ARENA } from './services/augment-detector.js';
+import { analyzeDraft, draftAiNames, type DraftRequest } from './services/draft-ai.js';
 import {
   fetchRosterOpgg,
   getChampionBuild,
@@ -90,6 +91,9 @@ function makeOverlayWindow(
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
+      // Overlays sobre el juego: Chromium los cree "ocultos" y congela rAF → las
+      // animaciones (framer) se quedaban a medias (vista oscura/borrosa).
+      backgroundThrottling: false,
     },
   });
   if (pin) {
@@ -118,6 +122,7 @@ function ensure(kind: WinKind): BrowserWindow {
           preload: path.join(__dirname, 'preload.cjs'),
           contextIsolation: true,
           nodeIntegration: false,
+          backgroundThrottling: false,
           // Pestaña "ATAK.GG": el frontend real embebido en un <webview>
           // (proceso aislado, sin acceso a window.atak).
           webviewTag: true,
@@ -132,7 +137,7 @@ function ensure(kind: WinKind): BrowserWindow {
       wins.set('main', win);
       return win;
     }
-    case 'hud': return makeOverlayWindow('hud', { w: 360, h: 640, alwaysOnTop: true, resizable: false });
+    case 'hud': return makeOverlayWindow('hud', { w: 320, h: 420, alwaysOnTop: true, resizable: false });
     // Champ select: movible, NO always-on-top (no tapa el client a la fuerza)
     case 'champselect':
       return makeOverlayWindow('champselect', {
@@ -163,6 +168,7 @@ function ensure(kind: WinKind): BrowserWindow {
           preload: path.join(__dirname, 'preload.cjs'),
           contextIsolation: true,
           nodeIntegration: false,
+          backgroundThrottling: false,
         },
       });
       win.setIgnoreMouseEvents(true, { forward: true });
@@ -315,10 +321,64 @@ lcu.on('phase', handlePhase);
 lcu.on('connected', () => broadcast('lcu-connected'));
 lcu.on('disconnected', () => broadcast('lcu-disconnected'));
 lcu.on('summoner', (s) => broadcast('summoner', s));
+// ── Datos del cliente de Riot por jugador del draft (una vez por puuid) ──────
+// Nombre de invocador, rango SoloQ/Flex y maestría por campeón. En ranked el
+// LCU oculta el puuid de los enemigos: solo se enriquece lo que el cliente da.
+interface CellInfo {
+  gameName: string;
+  tagLine: string;
+  rank: { queue: string; tier: string; division: string; lp: number; wins: number; losses: number } | null;
+  masteryByChamp: Record<number, { level: number; points: number }>;
+}
+const cellInfoCache = new Map<string, Promise<CellInfo>>();
+function getCellInfo(puuid: string, summonerId: number): Promise<CellInfo> {
+  const hit = cellInfoCache.get(puuid);
+  if (hit) return hit;
+  const job = (async (): Promise<CellInfo> => {
+    const [sum, ranked, m1] = await Promise.all([
+      lcu.get<any>(`/lol-summoner/v2/summoners/puuid/${puuid}`),
+      lcu.get<any>(`/lol-ranked/v1/ranked-stats/${puuid}`),
+      lcu.get<any>(`/lol-champion-mastery/v1/${puuid}/champion-mastery`),
+    ]);
+    let mastery: any[] = Array.isArray(m1) ? m1 : [];
+    if (!mastery.length && summonerId) {
+      const m2 = await lcu.get<any>(`/lol-collections/v1/inventories/${summonerId}/champion-mastery`);
+      if (Array.isArray(m2)) mastery = m2;
+    }
+    const masteryByChamp: Record<number, { level: number; points: number }> = {};
+    for (const m of mastery) {
+      const id = Number(m?.championId);
+      if (id) masteryByChamp[id] = { level: Number(m?.championLevel) || 0, points: Number(m?.championPoints) || 0 };
+    }
+    const qmap = ranked?.queueMap || {};
+    const q = qmap.RANKED_SOLO_5x5?.tier && qmap.RANKED_SOLO_5x5.tier !== 'NONE' ? qmap.RANKED_SOLO_5x5
+      : qmap.RANKED_FLEX_SR?.tier && qmap.RANKED_FLEX_SR.tier !== 'NONE' ? qmap.RANKED_FLEX_SR : null;
+    return {
+      gameName: String(sum?.gameName || sum?.displayName || ''),
+      tagLine: String(sum?.tagLine || ''),
+      rank: q ? {
+        queue: String(q.queueType || ''), tier: String(q.tier || ''), division: String(q.division || ''),
+        lp: Number(q.leaguePoints) || 0, wins: Number(q.wins) || 0, losses: Number(q.losses) || 0,
+      } : null,
+      masteryByChamp,
+    };
+  })().catch((): CellInfo => ({ gameName: '', tagLine: '', rank: null, masteryByChamp: {} }));
+  cellInfoCache.set(puuid, job);
+  return job;
+}
+
 lcu.on('champ-select-update', (state) => {
   // Resuelve nombres/tags en el main para que la UI analice comp sin otra llamada.
   void (async () => {
     const patch = await getPatchData().catch(() => null);
+    // Riot API (LCU) por celda: nombre, rango y maestría (cacheado por puuid).
+    const cells: any[] = [...(state.session?.myTeam || []), ...(state.session?.theirTeam || [])];
+    const infoByCell = new Map<number, CellInfo>();
+    await Promise.all(cells.map(async (c) => {
+      const puuid = String(c?.puuid || '');
+      if (!puuid || puuid === '0') return;
+      infoByCell.set(Number(c.cellId), await getCellInfo(puuid, Number(c?.summonerId) || 0));
+    }));
     // Celdas con acción en curso: son los jugadores a los que les toca banear o
     // pickear ahora mismo (la UI las resalta).
     const actingCells = new Set<number>();
@@ -336,6 +396,7 @@ lcu.on('champ-select-update', (state) => {
     const mapPick = (p: any) => {
       const championId = Number(p.championId || p.championPickIntent || 0) || 0;
       const meta = championId && patch ? patch.champById[championId] : null;
+      const info = infoByCell.get(Number(p.cellId)) || null;
       return {
         cellId: p.cellId,
         championId,
@@ -344,6 +405,11 @@ lcu.on('champ-select-update', (state) => {
         position: p.assignedPosition || '',
         isLocal: p.cellId === state.session?.localPlayerCellId,
         acting: actingCells.has(Number(p.cellId)),
+        spells: [Number(p.spell1Id) || 0, Number(p.spell2Id) || 0],
+        summonerName: info?.gameName || '',
+        tagLine: info?.tagLine || '',
+        rank: info?.rank || null,
+        mastery: championId && info ? info.masteryByChamp[championId] || null : null,
       };
     };
     const myBans = (state.session?.bans?.myTeamBans || []).map(Number).filter(Boolean);
@@ -371,6 +437,7 @@ lcu.on('champ-select-update', (state) => {
 });
 // Cierre forzado al terminar/dodge champ select (además de handlePhase).
 lcu.on('champ-select-ended', () => {
+  cellInfoCache.clear();
   broadcast('champ-select-ended');
   closeWin('champselect');
 });
@@ -510,6 +577,10 @@ async function emitChampionBuild(
         runes,
         runePage,
         items,
+        // Builds completas (6 items) con variantes y alternativas por slot.
+        fullBuilds: opgg?.full_builds ?? [],
+        itemOptions: opgg?.item_options ?? null,
+        spells: opgg?.spell_ids ?? [],
         counters: {
           weakAgainst: weak,
           strongAgainst: strong,
@@ -579,13 +650,28 @@ async function emitChampionBuild(
 lcu.on('local-champion-changed', (championId: number, position: string) => {
   void emitChampionBuild(championId, position, false);
 });
-lcu.on('eog-stats', (payloadIn: any) => {
+lcu.on('eog-stats', (payloadIn: any) => void (async () => {
   // lcu emite { eog, ranked } (ranked = before/after/lpDelta).
   closeWin('players');
   const eog = payloadIn?.eog ?? payloadIn;
   const ranked = payloadIn?.ranked ?? null;
+  // Rango de los 10 jugadores (LCU ranked-stats por puuid; en paralelo).
+  const ranks: Record<string, any> = {};
+  const people: any[] = (Array.isArray(eog?.teams) ? eog.teams : []).flatMap((t: any) => t?.players || []);
+  await Promise.all(people.map(async (p: any) => {
+    const puuid = String(p?.puuid || p?.stats?.puuid || '');
+    if (!puuid || puuid === '0' || ranks[puuid]) return;
+    const r = await lcu.get<any>(`/lol-ranked/v1/ranked-stats/${puuid}`);
+    const qmap = r?.queueMap || {};
+    const q = qmap.RANKED_SOLO_5x5?.tier && qmap.RANKED_SOLO_5x5.tier !== 'NONE' ? qmap.RANKED_SOLO_5x5
+      : qmap.RANKED_FLEX_SR?.tier && qmap.RANKED_FLEX_SR.tier !== 'NONE' ? qmap.RANKED_FLEX_SR : null;
+    ranks[puuid] = q
+      ? { queue: String(q.queueType || ''), tier: String(q.tier || ''), division: String(q.division || ''), lp: Number(q.leaguePoints) || 0, wins: Number(q.wins) || 0, losses: Number(q.losses) || 0 }
+      : null;
+  }));
   const payload = {
     ...eog,
+    _ranks: ranks,
     _liveEvents: lastLiveEvents,
     _region: lcu.region,
     _summoner: lcu.summoner,
@@ -601,7 +687,7 @@ lcu.on('eog-stats', (payloadIn: any) => {
   const w = wins.get('eog');
   w?.webContents.once('did-finish-load', () => w.webContents.send('eog-data', payload));
   setTimeout(() => w?.webContents.send('eog-data', payload), 400);
-});
+})());
 
 live.on('game-started', () => {
   lastLiveEvents = [];
@@ -626,33 +712,36 @@ augDetector.on('offers', (matches) => {
   if (matches) {
     const win = w && !w.isDestroyed() ? w : ensure('augbadges');
     win.showInactive();
-    win.webContents.send('aug-offers', matches);
+    // El overlay pinta "sinergia con {campeón}": va el nombre junto a las cards.
+    win.webContents.send('aug-offers', { matches, championName: lastMeChampionName });
   } else if (w && !w.isDestroyed()) {
     w.webContents.send('aug-offers', null);
     setTimeout(() => { if (!w.isDestroyed()) w.hide(); }, 250);
   }
 });
 
-// Al detectar partida de ARAM: preparar huellas del pool (stats del campeón
-// propio incluidas) y arrancar la vigilancia visual. Una vez por partida.
+// Al detectar partida de ARAM o Arena: preparar huellas del pool (stats del
+// campeón propio incluidas) y arrancar la vigilancia visual. Una vez por partida.
 let augmentsAutoShown = false;
 live.on('state', (state) => {
+  const liveMode = String(state?.gameMode || '').toUpperCase();
   if (
     !augmentsAutoShown && !casterMode
     && state?.isActive
-    && String(state?.gameMode || '').toUpperCase() === 'ARAM'
+    && (liveMode === 'ARAM' || liveMode === 'CHERRY')
     && (state?.players || []).some((p: any) => p.isMe && p.championName)
   ) {
     augmentsAutoShown = true;
     void (async () => {
       try {
         const me = (state.players || []).find((p: any) => p.isMe);
+        lastMeChampionName = String(me?.championName || '');
         const championId = await championIdByName(me?.championName || '');
         const board = await getAramAugmentBoard(championId);
         if (!board.length) { ensure('augments'); return; } // sin datos → panel F7 clásico
         const n = await augDetector.prepare(board);
         console.log(`[aug-detector] ${n} huellas de iconos listas — vigilando la oferta de augments`);
-        augDetector.start();
+        augDetector.start(1800, liveMode === 'CHERRY' ? CARD_GEOM_ARENA : CARD_GEOM);
       } catch (e: any) {
         console.warn('[aug-detector] no arrancó:', e?.message);
         ensure('augments');
@@ -783,6 +872,28 @@ ipcMain.handle('opgg-roster', async () => {
   };
   rosterPayloadCache = { key: rosterKey, payload };
   return payload;
+});
+
+// ATAK Coach: análisis IA del draft → build personalizada para esta partida.
+ipcMain.handle('draft-analyze', async (_e, req: DraftRequest) => {
+  if (!req?.me?.championName) return null;
+  try {
+    return await analyzeDraft({ ...req, mode: req.mode || currentOpggMode() });
+  } catch (e: any) {
+    console.warn('[draft-ai] falló:', e?.message);
+    return null;
+  }
+});
+ipcMain.handle('draft-ai-names', async () => await draftAiNames().catch(() => ({ items: {}, runes: {} })));
+
+// Meta de un campeón en su rol (tier / WR / PR / BR) para los chips del draft.
+// Reusa el caché de builds del servicio: una llamada por campeón+rol.
+ipcMain.handle('champ-meta', async (_e, championName: string, position: string) => {
+  if (!championName) return null;
+  const b = await getChampionBuild(String(championName), String(position || ''), currentOpggMode()).catch(() => null);
+  if (!b) return null;
+  const pct = (v: number | null) => (v == null ? null : v <= 1 ? Math.round(v * 1000) / 10 : Math.round(v * 10) / 10);
+  return { winRate: pct(b.win_rate), pickRate: pct(b.pick_rate), banRate: pct(b.ban_rate), tier: b.tier, rank: b.rank };
 });
 
 ipcMain.handle('opgg-build', async (_e, championName: string, position: string) => {
@@ -945,6 +1056,19 @@ ipcMain.handle('toggle-overlay', (_e, kind: string) => {
       : animatedShow(existing);
   } else {
     ensure(kind as WinKind);
+  }
+  return { ok: true };
+});
+
+// Traer un overlay al frente sin togglear (segmented SELECT | EN PARTIDA del
+// post-partida): si ya está visible se queda visible.
+ipcMain.handle('show-overlay', (_e, kind: string) => {
+  if (kind !== 'hud' && kind !== 'champselect') return { ok: false };
+  const existing = wins.get(kind);
+  if (existing && !existing.isDestroyed()) {
+    animatedShow(existing, kind === 'hud' ? undefined : (w) => { w.show(); w.focus(); });
+  } else {
+    ensure(kind);
   }
   return { ok: true };
 });

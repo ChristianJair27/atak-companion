@@ -1,0 +1,60 @@
+/* src/views/hud.css — layout del HUD compacto in-game (ventana 320×420, F9).
+   Tokens y componentes vienen de hextech.css; aquí solo disposición.
+   Motion: solo opacity / transform / width. */
+
+.hud-root { position: fixed; inset: 6px; display: flex; flex-direction: column; align-items: stretch; }
+.hud-wait { align-self: flex-start; }
+
+/* ── Cabecera: retrato hex + nivel, nombre, reloj, HP / recurso ──────────── */
+.hud-head { display: flex; align-items: center; gap: 10px; }
+.hud-face { position: relative; flex: none; }
+.hud-lvl {
+  position: absolute; right: -6px; bottom: -4px; width: 19px; height: 19px;
+  display: grid; place-items: center;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  background: linear-gradient(180deg, var(--hx-gold-bright), var(--hx-gold) 60%, #8a6d3b);
+  color: #0b0f19; font: 700 10px var(--hx-display); line-height: 1;
+}
+.hud-id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.hud-name-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.hud-name { font-size: 13px; color: #fff; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hud-clock { font-size: 13px; font-weight: 700; color: var(--hx-gold-bright); letter-spacing: 0.04em; flex: none; }
+.hud-rail > i { display: block; height: 100%; transition: width 300ms var(--hx-ease); }
+.hud-rail.hp > i { background: linear-gradient(90deg, #2f8f3f, var(--hx-green)); box-shadow: 0 0 6px rgb(77 187 99 / 0.4); }
+.hud-rail.hp.low > i { background: linear-gradient(90deg, #8a1119, var(--hx-crimson)); box-shadow: 0 0 6px rgb(225 36 46 / 0.5); }
+.hud-rail.mana > i { background: linear-gradient(90deg, #2b6fb5, var(--hx-blue)); }
+.hud-rail.energy > i { background: linear-gradient(90deg, #a08a3a, #f0d86e); }
+.hud-rail.other > i { background: linear-gradient(90deg, #8a1119, var(--hx-crimson)); }
+
+/* ── KDA ─────────────────────────────────────────────────────────────────── */
+.hud-kda { display: flex; align-items: baseline; justify-content: center; gap: 10px; }
+.hud-kda-n { display: inline-flex; align-items: baseline; gap: 0.22em; font-family: var(--hx-display); font-weight: 700; font-size: 26px; letter-spacing: 0.04em; line-height: 1; }
+.hud-kda-n .sep { color: var(--hx-gold-dim); font-size: 20px; }
+.hud-kda-r { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--hx-gold); }
+
+/* ── Anillos CS/MIN · KP · VISIÓN ────────────────────────────────────────── */
+.hud-rings { display: flex; justify-content: space-around; align-items: center; padding: 0 4px; }
+
+/* ── Siguiente item ──────────────────────────────────────────────────────── */
+.hud-next { display: flex; flex-direction: column; gap: 5px; }
+.hud-next-row { display: flex; align-items: center; gap: 9px; }
+.hud-next-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.hud-next-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.hud-next-name { font-size: 12px; font-weight: 600; color: var(--hx-gold-bright); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hud-next-need { font-size: 11px; font-weight: 700; color: var(--hx-gold); flex: none; letter-spacing: 0.04em; }
+.hud-next-need.ok { color: var(--hx-green); font-family: var(--hx-display); letter-spacing: 0.1em; }
+.hud-next-foot { font-size: 10px; color: var(--hx-muted); }
+.hud-next-muted { font-size: 11px; color: var(--hx-muted); letter-spacing: 0.06em; }
+
+/* ── Objetivos (pills) ───────────────────────────────────────────────────── */
+.hud-objs { display: flex; gap: 5px; }
+.hud-pill { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 3px 7px; border: 1px solid var(--hx-gold-faint); background: rgb(255 255 255 / 0.03); min-width: 0; }
+.hud-pill .k { font-size: 8.5px; letter-spacing: 0.12em; color: var(--hx-muted); font-weight: 600; }
+.hud-pill .v { font-size: 11px; font-weight: 700; color: var(--hx-ink); }
+.hud-pill.live { border-color: rgb(225 36 46 / 0.6); background: rgb(225 36 46 / 0.12); }
+.hud-pill.live .k, .hud-pill.live .v { color: var(--hx-crimson); }
+.hud-pill.off .v { color: var(--hx-faint); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-rail > i { transition: none; }
+}

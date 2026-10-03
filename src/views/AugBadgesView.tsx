@@ -1,10 +1,11 @@
-// Badges flotantes SOBRE las cards de augments de League (ARAM) — estilo
-// Blitz: al detectarse la oferta (visión por iconos en el main), cada card
-// recibe su chip con TIER + % de pickeo de la comunidad para tu campeón.
-// La ventana es fullscreen, transparente y deja pasar los clics: el jugador
-// selecciona la card del juego normalmente.
+// Barras flotantes SOBRE las cards de augments de League (ARAM / Arena).
+// Al detectarse la oferta (visión por iconos en el main), cada card recibe
+// encima una barra de progreso con el % de pickeo de la comunidad para TU
+// campeón y la sinergia (tier OP.GG con ese campeón). La ventana es fullscreen,
+// transparente y deja pasar los clics: el jugador elige la card del juego.
 import { useEffect, useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { EASE } from '../motion';
 
 type Offer = {
   slot: number;
@@ -14,90 +15,124 @@ type Offer = {
     pickRate: number; performance: number; rarity: number;
   };
 };
+type Payload = { matches: Offer[]; championName: string } | Offer[] | null;
 
-const TIER_STYLES = [
-  { label: 'S', color: '#ffd25e' },
-  { label: 'A', color: '#4dbb63' },
-  { label: 'B', color: '#6db3ff' },
-  { label: 'C', color: '#c9cdd6' },
-  { label: 'D', color: '#ff5a64' },
+// Sinergia con el campeón = tier OP.GG del augment PARA ese campeón (1 = OP).
+const SYNERGY = [
+  { min: 0, label: 'SINERGIA ALTA', color: '#3DDC97' },
+  { min: 3, label: 'BUENA SINERGIA', color: '#3EC6E0' },
+  { min: 4, label: 'SINERGIA MEDIA', color: '#E8C063' },
+  { min: 5, label: 'SINERGIA BAJA', color: '#E23B4A' },
 ];
-const RARITY_RING = ['rgba(192,199,210,0.6)', 'rgba(255,210,94,0.75)', 'rgba(210,140,255,0.85)'];
+const synergyOf = (tier: number) => {
+  if (!tier) return { label: 'SIN DATOS', color: '#8b8f9a' };
+  let out = SYNERGY[0];
+  for (const s of SYNERGY) if (tier >= s.min) out = s;
+  return out;
+};
+const RARITY = ['PLATA', 'ORO', 'PRISMÁTICO'];
 
 export default function AugBadgesView() {
   const [offers, setOffers] = useState<Offer[] | null>(null);
-  useEffect(() => window.atak.onAugOffers((o: Offer[] | null) => setOffers(o)), []);
+  const [champion, setChampion] = useState('');
+  const reduce = useReducedMotion();
+  useEffect(() => window.atak.onAugOffers((p: Payload) => {
+    if (!p) { setOffers(null); return; }
+    if (Array.isArray(p)) { setOffers(p); return; }
+    setOffers(p.matches);
+    setChampion(p.championName || '');
+  }), []);
 
-  // Tier relativo entre lo ofrecido + el pool: usar el tier crudo ordenado
-  // (menor = mejor). Con solo 3 cards, mapear por orden global estándar 3/4/5.
-  const tierStyleOf = useMemo(() => {
-    const present = [...new Set((offers ?? []).map((o) => o.augment.tier).filter((t) => t > 0))].sort((a, b) => a - b);
-    return (tier: number) => {
-      const i = present.indexOf(tier);
-      return TIER_STYLES[i >= 0 ? Math.min(i, TIER_STYLES.length - 1) : TIER_STYLES.length - 1];
-    };
-  }, [offers]);
-
-  // Mejor pick recomendado: menor tier; empate → más pickeado.
+  // Mejor pick: menor tier con tu campeón; empate → más pickeado.
   const bestSlot = useMemo(() => {
     if (!offers?.length) return -1;
     const sorted = [...offers].sort((a, b) =>
       (a.augment.tier || 9) - (b.augment.tier || 9) || b.augment.pickRate - a.augment.pickRate);
     return sorted[0].slot;
   }, [offers]);
+  const maxPick = Math.max(1, ...(offers ?? []).map((o) => o.augment.pickRate));
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden', fontFamily: "'Outfit', 'Saira Condensed', sans-serif" }}>
       <AnimatePresence>
         {(offers ?? []).map((o) => {
-          const t = tierStyleOf(o.augment.tier);
+          const syn = synergyOf(o.augment.tier);
           const isBest = o.slot === bestSlot;
+          const pick = Math.max(0, Math.min(100, o.augment.pickRate));
           return (
             <motion.div
               key={`${o.slot}-${o.augment.id}`}
-              initial={{ opacity: 0, y: 14, scale: 0.92 }}
-              animate={{ opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 360, damping: 26, delay: o.slot * 0.06 } }}
-              exit={{ opacity: 0, y: 8, scale: 0.95, transition: { duration: 0.18 } }}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0, transition: { duration: 0.35, ease: EASE, delay: o.slot * 0.08 } }}
+              exit={{ opacity: 0, y: 6, transition: { duration: 0.15, ease: EASE } }}
               style={{
                 position: 'absolute',
                 left: `${o.x * 100}%`,
                 top: `${o.y * 100}%`,
                 transform: 'translate(-50%, -100%)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                width: 'min(300px, 22vw)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
               }}
             >
               {isBest && (
-                <span style={{
-                  fontSize: 9, fontWeight: 900, letterSpacing: '0.18em',
-                  color: '#ffd25e', textShadow: '0 0 12px rgba(255,210,94,0.8)',
-                }}>
-                  ★ RECOMENDADO
-                </span>
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1, transition: { duration: 0.3, delay: 0.5 } }}
+                  style={{
+                    fontSize: 11, fontWeight: 600, letterSpacing: '0.2em',
+                    color: '#ffd25e', textShadow: '0 0 12px rgba(255,210,94,0.8)',
+                  }}
+                >
+                  RECOMENDADO
+                </motion.span>
               )}
               <div style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '6px 12px', borderRadius: 12,
-                background: 'rgba(8,8,11,0.92)',
-                border: `1.5px solid ${isBest ? 'rgba(255,210,94,0.65)' : RARITY_RING[o.augment.rarity] ?? RARITY_RING[0]}`,
-                boxShadow: isBest
-                  ? '0 6px 24px rgba(0,0,0,0.6), 0 0 24px rgba(255,210,94,0.25)'
-                  : '0 6px 24px rgba(0,0,0,0.6)',
-                backdropFilter: 'blur(8px)',
+                width: '100%',
+                padding: '10px 12px 12px', borderRadius: 14,
+                background: 'rgba(8,10,14,0.9)',
+                border: `1px solid ${isBest ? 'rgba(255,210,94,0.7)' : 'rgb(255 255 255 / 0.14)'}`,
+                boxShadow: isBest ? '0 8px 28px rgba(0,0,0,0.6), 0 0 24px rgba(255,210,94,0.2)' : '0 8px 28px rgba(0,0,0,0.6)',
+                backdropFilter: 'blur(10px)',
+                color: '#E7E4DE',
               }}>
-                <span style={{
-                  width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center',
-                  font: '800 12px var(--font-data, monospace)', color: t.color,
-                  background: `${t.color}22`, border: `1px solid ${t.color}66`,
-                }}>
-                  {t.label}
-                </span>
-                <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {/* Nombre + rareza */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {o.augment.name}
                   </span>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
-                    {o.augment.pickRate > 0 ? `${o.augment.pickRate}% de la comunidad` : 'poco pickeado'}
+                  <span style={{ fontSize: 9, letterSpacing: '0.14em', color: '#6D767E', flex: 'none' }}>
+                    {RARITY[o.augment.rarity] ?? ''}
                   </span>
+                </div>
+
+                {/* Sinergia con el campeón en uso */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                  <span style={{ fontSize: 10, letterSpacing: '0.12em', color: syn.color, fontWeight: 600 }}>
+                    {syn.label}{champion ? ` · ${champion.toUpperCase()}` : ''}
+                  </span>
+                  {o.augment.performance > 0 && (
+                    <span style={{ fontSize: 10, color: '#A1A8B0', fontVariantNumeric: 'tabular-nums' }}>
+                      rendimiento {o.augment.performance}
+                    </span>
+                  )}
+                </div>
+
+                {/* Barra de % de pickeo (ancho relativo al 100%; brillo relativo a la oferta) */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+                  <span style={{ flex: 1, height: 8, borderRadius: 4, background: 'rgb(255 255 255 / 0.1)', overflow: 'hidden' }}>
+                    <motion.i
+                      style={{ display: 'block', height: '100%', borderRadius: 4, background: syn.color, opacity: 0.55 + 0.45 * (pick / maxPick) }}
+                      initial={reduce ? false : { width: 0 }}
+                      animate={{ width: `${Math.max(pick, 2)}%` }}
+                      transition={reduce ? { duration: 0 } : { duration: 0.6, ease: EASE, delay: 0.15 + o.slot * 0.08 }}
+                    />
+                  </span>
+                  <span style={{ fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums', minWidth: 48, textAlign: 'right' }}>
+                    {pick > 0 ? `${pick}%` : '<1%'}
+                  </span>
+                </div>
+                <div style={{ fontSize: 10, color: '#6D767E', marginTop: 3 }}>
+                  de pickeo de la comunidad{champion ? ` con ${champion}` : ''}
                 </div>
               </div>
             </motion.div>

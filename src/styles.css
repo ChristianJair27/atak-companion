@@ -195,6 +195,7 @@ body {
   right: auto;
   display: block;
   background: linear-gradient(90deg, var(--crimson-deep), var(--crimson));
+  transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .bar.silver > i { background: linear-gradient(90deg, #4a4e58, var(--metal)); }
 .bar .bar-txt {
@@ -554,5 +555,5 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .anim-rise, .anim-fade, .anim-hero, .anim-stagger > *, .eog-row { animation: none; }
-  .eog-row, .eog-stat { transition: none; }
+  .eog-row, .eog-stat, .bar > i, .dmg-track-rail > i { transition: none; }
 }

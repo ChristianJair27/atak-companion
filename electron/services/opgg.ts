@@ -113,7 +113,7 @@ function parseOPGGText(text: string): any {
   try { return parseVal(); } catch { return null; }
 }
 
-async function callTool(name: string, args: Record<string, any>): Promise<any> {
+export async function callTool(name: string, args: Record<string, any>): Promise<any> {
   const json = await postJson(MCP_URL, {
     jsonrpc: '2.0',
     id: Date.now(),
@@ -186,7 +186,18 @@ export interface OPGGFullProfile {
   is_fresh_blood: boolean;
 }
 
+/** Opción de item para un slot (4º/5º/6º/último) con su muestra OP.GG. */
+export interface ItemOption { id: number; name: string; pickRate: number | null; winRate: number | null; play: number }
+/** Build completa de 6 (botas + core + 4º/5º/6º) armada con las opciones más jugadas. */
+export interface FullBuild { label: string; ids: number[]; names: string[]; pickRate: number | null; winRate: number | null; play: number }
+
 export interface OPGGBuild {
+  /** Hasta 3 builds completas (la 1ª es la más jugada). */
+  full_builds: FullBuild[];
+  /** Alternativas por slot para que el jugador cambie una pieza. */
+  item_options: { fourth: ItemOption[]; fifth: ItemOption[]; sixth: ItemOption[]; last: ItemOption[] };
+  /** Hechizos de invocador más jugados (ids). */
+  spell_ids: number[];
   rune_ids: number[];
   primary_rune_names: string[];
   secondary_rune_names: string[];
@@ -409,6 +420,11 @@ async function buildFromAnalysis(
       'data.core_items',
       'data.boots',
       'data.starter_items',
+      'data.fourth_items',
+      'data.fifth_items',
+      'data.sixth_items',
+      'data.last_items',
+      'data.summoner_spells',
       'data.skills',
       'data.summary.average_stats',
     ],
@@ -426,14 +442,72 @@ async function buildFromAnalysis(
   ];
   while (rune_ids.length < 9) rune_ids.push(5001);
   const avg = d.summary?.average_stats;
+
+  // ── Build completa: core + opciones de 4º/5º/6º (OP.GG las da por slot) ──
+  const opt = (arr: any): ItemOption[] => (Array.isArray(arr) ? arr : [])
+    .map((o: any) => ({
+      id: Number(o?.ids?.[0]) || 0,
+      name: String(o?.ids_names?.[0] ?? ''),
+      pickRate: typeof o?.pick_rate === 'number' ? Math.round(o.pick_rate * 1000) / 10 : null,
+      winRate: o?.play ? Math.round((Number(o.win) / Number(o.play)) * 1000) / 10 : null,
+      play: Number(o?.play) || 0,
+    }))
+    .filter((o: ItemOption) => o.id > 0);
+  const item_options = { fourth: opt(d.fourth_items), fifth: opt(d.fifth_items), sixth: opt(d.sixth_items), last: opt(d.last_items) };
+  // El MCP devuelve UN solo core y no siempre el popular (p.ej. Katarina AD con
+  // 14% de pick). `last_items` trae los items legendarios más comprados con su
+  // muestra real: si el core trae poco pick, el core real se arma con ellos.
+  let coreIds: number[] = (d.core_items?.ids ?? []).map(Number).filter((n: number) => n > 0);
+  let coreNames: string[] = d.core_items?.ids_names ?? [];
+  const corePick = Number(d.core_items?.pick_rate) || 0;
+  const legendary = (o: ItemOption) => o.id >= 2000 && o.id !== Number(d.boots?.ids?.[0]);
+  const popular = [...item_options.last, ...item_options.fourth, ...item_options.fifth]
+    .filter(legendary)
+    .sort((a, b) => (b.pickRate ?? 0) - (a.pickRate ?? 0));
+  if (coreIds.length && corePick < 0.3 && (popular[0]?.pickRate ?? 0) >= corePick * 100 * 2) {
+    const seen = new Set<number>();
+    const derived = popular.filter((o) => (seen.has(o.id) ? false : (seen.add(o.id), true))).slice(0, 3);
+    if (derived.length >= 2) {
+      coreIds = derived.map((o) => o.id);
+      coreNames = derived.map((o) => o.name);
+    }
+  }
+  const bootsId = Number(d.boots?.ids?.[0]) || 0;
+  const full_builds: FullBuild[] = [];
+  const variants = Math.max(1, Math.min(3, item_options.fourth.length || 1));
+  for (let v = 0; v < variants; v++) {
+    const ids = [...(bootsId ? [bootsId] : []), ...coreIds];
+    const names = [...(bootsId ? [String(d.boots?.ids_names?.[0] ?? '')] : []), ...coreNames];
+    let head: ItemOption | null = null;
+    for (const [i, list] of [item_options.fourth, item_options.fifth, item_options.sixth].entries()) {
+      if (ids.length >= 6) break;
+      // En cada slot: la opción v-ésima si existe, si no la primera que no se repita.
+      const pick = [list[v], ...list].find((o) => o && !ids.includes(o.id));
+      if (!pick) continue;
+      if (i === 0) head = pick;
+      ids.push(pick.id);
+      names.push(pick.name);
+    }
+    if (ids.length <= coreIds.length + (bootsId ? 1 : 0)) continue;
+    if (full_builds.some((b) => b.ids.join(',') === ids.join(','))) continue;
+    full_builds.push({
+      label: v === 0 ? 'Más jugada' : `Build ${v + 1}`,
+      ids, names,
+      pickRate: head?.pickRate ?? null, winRate: head?.winRate ?? null, play: head?.play ?? 0,
+    });
+  }
+
   return {
+    full_builds,
+    item_options,
+    spell_ids: (d.summoner_spells?.ids ?? []).map(Number).filter((n: number) => n > 0),
     rune_ids,
     primary_rune_names: runes.primary_rune_names ?? [],
     secondary_rune_names: runes.secondary_rune_names ?? [],
     primary_path_id: runes.primary_page_id ?? 8000,
     secondary_path_id: runes.secondary_page_id ?? 8300,
-    core_item_ids: d.core_items?.ids ?? [],
-    core_item_names: d.core_items?.ids_names ?? [],
+    core_item_ids: coreIds,
+    core_item_names: coreNames,
     boots_id: d.boots?.ids?.[0] ?? 3006,
     boots_name: d.boots?.ids_names?.[0] ?? '',
     starter_ids: d.starter_items?.ids ?? [],
