@@ -305,7 +305,23 @@ export async function analyzeDraft(req: DraftRequest): Promise<DraftAnalysis> {
   if (!basePage && !build) return rulesAnalysis();
 
   // ── Prompt ────────────────────────────────────────────────────────────────
-  const user = `PARCHE ${patch.version} · MODO ${mode}
+  // Versión compacta para la IA hosteada (CPU): catálogos recortados a lo
+  // relevante para que el prompt baje de ~4k a ~1.2k tokens.
+  const makePrompt = (compact: boolean) => {
+    const runeList = compact
+      ? runeCandidates.filter((r) => r.slot === 0 || basePage?.ids.includes(r.id))
+      : runeCandidates;
+    const relevant = new Set<number>([
+      ...baseBuild, ...(build?.starter_ids || []).slice(0, 3),
+      ...[...(build?.item_options?.fourth || []), ...(build?.item_options?.fifth || [])].slice(0, 2).map((o) => o.id),
+      ...SITUATIONAL.filter((x) => {
+        const n = x.need.toLowerCase();
+        return n.includes('antisanaci') || (dmg.ap >= 2 && /ap|mágic|rookern|banshee|fauces/.test(n)) || (dmg.ad >= 2 && /ad|armadura|zhonya|randuin|crít|frozen|hielo/.test(n))
+          || (dmg.cc >= 2 && /cc/.test(n)) || (dmg.tank >= 2 && /armadura|resistencia|void|dominik|vacío/.test(n));
+      }).map((x) => x.id),
+    ]);
+    const itemList = compact ? itemCandidates.filter((i) => relevant.has(i.id)) : itemCandidates;
+    return `PARCHE ${patch.version} · MODO ${mode}
 JUGADOR: ${me} (${pos}) · clases: ${tagsOf(req.me).join('/') || '?'}
 ALIADOS: ${allies.map((a) => `${a.championName}${a.position ? ` (${a.position})` : ''} [${tagsOf(a).join('/')}]`).join(', ') || 'aún sin picks'}
 ENEMIGOS: ${enemyProfile.map((e) => `${e.name}${e.pos ? ` (${e.pos})` : ''} [${e.tags.join('/')}]`).join(', ') || 'aún sin picks'}
@@ -319,16 +335,20 @@ Builds completas más jugadas: ${(build?.full_builds || []).map((b) => `${b.labe
 ${matchup?.coreItems?.[0]?.ids?.length ? `Core del MATCHUP vs ${req.rival}: ${matchup.coreItems[0].ids.map((id) => `${items.byId[id]?.name || id}#${id}`).join(' → ')} (${matchup.coreItems[0].play} partidas)` : ''}
 Página de runas base (${basePage?.source}): ${basePage ? `${runes.pathById[basePage.primary]} + ${runes.pathById[basePage.secondary]} · ${basePage.ids.map((id) => `${runes.runes[id]?.name || id}#${id}`).join(', ')} · fragmentos ${basePage.shards.map((id) => `${SHARDS[id] || id}#${id}`).join(', ')}` : 'n/d'}
 
-CATÁLOGO DE RUNAS (id · nombre · rama · fila): ${runeCandidates.map((r) => `${r.id}·${r.name}·${r.path}·${r.slot}`).join('; ')}
+CATÁLOGO DE RUNAS (id · nombre · rama · fila): ${runeList.map((r) => `${r.id}·${r.name}·${r.path}·${r.slot}`).join('; ')}
 FRAGMENTOS: ${Object.entries(SHARDS).map(([id, n]) => `${id}·${n}`).join('; ')} (fila1: 5008/5005/5007 · fila2: 5008/5010/5001 · fila3: 5011/5013/5001)
-CATÁLOGO DE ITEMS (id · nombre · oro · nota): ${itemCandidates.map((i) => `${i.id}·${i.name}·${i.gold}${i.nota ? `·${i.nota}` : ''}`).join('; ')}
+CATÁLOGO DE ITEMS (id · nombre · oro · nota): ${itemList.map((i) => `${i.id}·${i.name}·${i.gold}${i.nota ? `·${i.nota}` : ''}`).join('; ')}
 HECHIZOS: ${spellCandidates.map((s) => `${s.id}·${s.name}`).join('; ')}
 
-Devuelve SOLO este JSON:
-{"resumen":"2 frases sobre cómo se juega ESTA partida","plan":["3 a 5 puntos concretos de plan de juego por fases"],"amenazas":[{"champion":"nombre","porQue":"1 frase"}],
+Devuelve SOLO este JSON${compact ? ' (breve: resumen de 1 frase, 3 puntos de plan cortos, 1 amenaza, razones de 1 frase)' : ''}:
+{"resumen":"${compact ? '1 frase' : '2 frases'} sobre cómo se juega ESTA partida","plan":["${compact ? '3 puntos cortos' : '3 a 5 puntos concretos de plan de juego por fases'}"],"amenazas":[{"champion":"nombre","porQue":"1 frase"}],
 "runas":{"primaryPathId":${basePage?.primary ?? 0},"secondaryPathId":${basePage?.secondary ?? 0},"ids":[6 ids: keystone + 3 primarias + 2 secundarias],"shards":[3 ids de fragmentos],"razon":"qué cambiaste respecto a la base y por qué (o 'sin cambios')"},
 "items":{"inicio":[ids de inicio],"build":[6 ids en orden de compra incluyendo botas],"situacionales":[{"id":123,"cuando":"condición concreta"}],"razon":"ajustes respecto al core OP.GG y por qué"},
 "hechizos":[2 ids],"confianza":0.0-1.0}`;
+  };
+  const user = makePrompt(false);
+  const userCompact = makePrompt(true);
+  if (process.env.DRAFT_AI_DEBUG) console.log(`[draft-ai] prompt ${user.length} chars · compacto ${userCompact.length} chars`);
 
   // ── Proveedor ─────────────────────────────────────────────────────────────
   let raw = ''; let provider: DraftAnalysis['provider'] = 'rules'; let model = '';
@@ -346,7 +366,7 @@ Devuelve SOLO este JSON:
       const m = (await ollamaHasModel(OLLAMA_MODEL)) ? OLLAMA_MODEL : OLLAMA_FALLBACK;
       return { content: await askOllama(m, SYSTEM_PROMPT, user, 90_000), model: m };
     }))
-    || await tryProvider('backend', () => askBackend(SYSTEM_PROMPT, user, 120_000));
+    || await tryProvider('backend', () => askBackend(SYSTEM_PROMPT, userCompact, 300_000));
   if (!done) return rulesAnalysis();
 
   const j = extractJson(raw);
