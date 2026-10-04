@@ -1,5 +1,5 @@
-/* src/views/players.css — layout del panel de jugadores (F8, 1480×900) sobre la
-   piel hextech (hextech.css). Dos columnas de slots (azul | rojo) y sidebar
+/* src/views/players.css — layout del panel de jugadores (F8, 1480×900) sobre el
+   kit Arena (hextech.css). Dos columnas de slots (azul | rojo) y sidebar
    central con el build + perfil del jugador seleccionado. Todo con scope .pv2.
    Motion: solo opacity / transform. */
 
@@ -10,36 +10,43 @@
   gap: 12px; padding: 12px;
 }
 .pv2-col { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: auto; padding-right: 2px; }
-.pv2-colhead { display: flex; align-items: center; gap: 10px; padding: 2px 6px 4px; }
+.pv2-colhead { display: flex; align-items: center; gap: 10px; padding: 2px 4px 4px; }
 .pv2-colhead.right { flex-direction: row-reverse; }
-.pv2-colhead .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.pv2-colhead .dot { width: 18px; height: 4px; border-radius: 0; flex: none; animation: none; }
 .pv2-colhead .sp { flex: 1; }
+.pv2-colhead-title { font-size: 20px; line-height: 1; text-transform: uppercase; }
+.pv2-colhead-title.red { color: var(--hx-crimson-hi); }
 .pv2-rows { display: flex; flex-direction: column; gap: 8px; }
 
 /* ── Topbar ──────────────────────────────────────────────────────────────── */
-.pv2-clock { font-size: 15px; font-weight: 700; color: var(--hx-gold-bright); }
-.pv2-reload { min-height: 28px; padding: 0 12px; font-size: 10px; }
-.pv2-err { padding: 6px 16px; font-size: 12px; color: #ff9aa0; background: rgb(225 36 46 / 0.12); border-bottom: 1px solid rgb(225 36 46 / 0.3); }
+.pv2-clock { font-family: var(--hx-display); font-size: 18px; font-weight: 700; color: var(--hx-ink); }
+.pv2-reload { min-height: 30px; padding: 0 12px; font-size: 12px; }
+.pv2-err { padding: 6px 16px; font-size: 13px; color: var(--hx-neg); background: var(--ax-red-wash); border-bottom: 1px solid rgba(232, 50, 60, 0.3); }
 
 /* ── Slot de jugador ─────────────────────────────────────────────────────── */
-.pv2 .hx-slot { --cut: 16px; }
-.pv2 .hx-slot > .hx-slot-in { min-height: 128px; padding: 8px 12px; gap: 12px; }
+.pv2 .hx-slot > .hx-slot-in { min-height: 128px; padding: 8px 12px 8px 14px; gap: 12px; }
+.pv2 .hx-slot.right > .hx-slot-in { padding: 8px 14px 8px 12px; }
 .pv2 .hx-slot > .hx-slot-in::after {
   content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: rgb(255 255 255 / 0.035); opacity: 0; transition: opacity 150ms var(--hx-ease);
+  background: rgba(255, 255, 255, 0.035); opacity: 0; transition: opacity 150ms var(--hx-ease);
 }
 .pv2 .hx-slot.clickable:hover > .hx-slot-in::after { opacity: 1; }
-.pv2 .hx-slot.is-selected { --edge: var(--hx-cyan); }
-.pv2 .hx-slot.is-selected > .hx-slot-in { box-shadow: inset 0 0 32px rgb(10 200 185 / 0.14), inset 3px 0 0 var(--hx-cyan); }
-.pv2 .hx-slot.right.is-selected > .hx-slot-in { box-shadow: inset 0 0 32px rgb(10 200 185 / 0.14), inset -3px 0 0 var(--hx-cyan); }
+/* Columnas por lado: el carril lleva el color del equipo. */
+.pv2 .hx-slot { --edge: var(--hx-blue); }
+.pv2 .hx-slot.right { --edge: var(--hx-crimson); }
+.pv2 .hx-slot.is-local { --edge: var(--hx-blue); border-color: var(--hx-line); }
+.pv2 .hx-slot.is-local > .hx-slot-in { background: none; }
+/* Seleccionado: carril y marco en blanco (el activo del sitio). */
+.pv2 .hx-slot.is-selected { --edge: #fff; border-color: rgba(255, 255, 255, 0.6); background: var(--ax-sunken); }
 .pv2 .hx-slot-mini { gap: 3px; }
 .pv2 .hx-slot-mini img, .pv2 .hx-slot-mini span { width: 22px; height: 22px; }
 
 .pv2-face { position: relative; flex: none; display: block; }
 .pv2-lvl {
-  position: absolute; right: -5px; bottom: -3px; min-width: 18px; height: 16px; padding: 0 4px;
-  display: grid; place-items: center; font-size: 10px; font-weight: 700; line-height: 1;
-  color: var(--hx-gold-bright); background: #070a12; border: 1px solid var(--hx-gold-dim);
+  position: absolute; right: -5px; bottom: -4px; min-width: 19px; height: 17px; padding: 0 4px;
+  display: grid; place-items: center; font-size: 11.5px; font-weight: 700; line-height: 1;
+  border-radius: var(--ax-r-chip);
+  color: #0a0a0c; background: var(--hx-ink); box-shadow: 0 0 0 2px var(--hx-panel-2);
 }
 .hx-slot.right .pv2-lvl { right: auto; left: -5px; }
 
@@ -47,71 +54,72 @@
 .pv2-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .hx-slot.right .pv2-row { flex-direction: row-reverse; }
 .pv2-row .sp { flex: 1; }
-.pv2-name { font-size: 14px; cursor: pointer; min-width: 0; }
-.pv2-name:hover { color: var(--hx-gold-bright); text-decoration: underline; text-underline-offset: 3px; }
+.pv2-name { font-size: 18px; cursor: pointer; min-width: 0; }
+.pv2-name:hover { color: var(--hx-crimson-hi); }
 .pv2 .hx-slot-sub { margin-top: 0; white-space: nowrap; flex: none; }
 .pv2-sub { flex-wrap: wrap; gap: 4px 8px; }
 .pv2-wr { flex: 1; min-width: 0; }
 .pv2-wr .hx-bar { gap: 3px; }
 .pv2-wr .hx-bar-head > * { white-space: nowrap; }
 .pv2-wr .hx-bar-head .hx-label { overflow: hidden; text-overflow: ellipsis; }
+.pv2-wr .hx-bar-value { font-size: 14px; }
 .hx-slot.right .hx-bar-head { flex-direction: row-reverse; }
-.pv2-today { font-size: 12px; font-weight: 700; white-space: nowrap; }
-.pv2-today .hx-label { margin-left: 4px; }
-.hx-slot.right .pv2-today .hx-label { margin-left: 0; margin-right: 4px; }
+.pv2-today { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.pv2-today .hx-label { margin-left: 5px; }
 .pv2-form { display: flex; align-items: flex-end; gap: 2px; height: 20px; flex: none; }
-.pv2-form > i { display: block; width: 8px; flex: none; transform-origin: 50% 100%; }
-.pv2-champstat { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.pv2-champstat b { font-family: var(--hx-mono); font-size: 11px; }
+.pv2-form > i { display: block; width: 8px; flex: none; border-radius: 1px; transform-origin: 50% 100%; }
+.pv2-champstat { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pv2-champstat b { font-family: var(--hx-mono); font-size: 12.5px; }
 .pv2-tags { display: flex; gap: 4px; flex-wrap: wrap; }
 .hx-slot.right .pv2-tags { flex-direction: row-reverse; }
-.pv2-tags .hx-pill { font-size: 9px; padding: 1px 6px; letter-spacing: 0.08em; }
-.pv2 .hx-pill.cyan { color: #9ff0e8; border-color: rgb(10 200 185 / 0.5); background: rgb(10 200 185 / 0.1); }
+.pv2-tags .hx-pill { font-size: 10.5px; min-height: 18px; padding: 0 6px; letter-spacing: 0.06em; }
 
 .pv2-live { flex: none; min-width: 118px; display: flex; flex-direction: column; gap: 5px; align-items: flex-end; text-align: right; }
 .hx-slot.right .pv2-live { align-items: flex-start; text-align: left; }
-.pv2-kda { font-size: 19px; font-weight: 700; letter-spacing: 0.02em; line-height: 1; }
+.pv2-kda { font-family: var(--hx-display); font-size: 24px; font-weight: 700; line-height: 1; }
 .pv2-kda .sep { color: var(--hx-faint); font-weight: 500; }
-.pv2-cs { font-size: 11px; color: var(--hx-muted); letter-spacing: 0.08em; }
+.pv2-cs { font-size: 12px; color: var(--hx-muted); letter-spacing: 0.08em; }
 .pv2-cs b { font-family: var(--hx-mono); color: var(--hx-ink); font-weight: 600; }
 .pv2-items { display: flex; gap: 3px; }
 .hx-slot.right .pv2-items { flex-direction: row-reverse; }
 
-/* Skeleton (hairline dorada que respira) */
-@keyframes pv2-pulse { from { opacity: 0.22; } to { opacity: 0.55; } }
+/* Skeleton */
+@keyframes pv2-pulse { from { opacity: 0.35; } to { opacity: 0.8; } }
 .pv2-skel { animation: pv2-pulse 0.9s ease-in-out infinite alternate; }
 .pv2-skel-lines { display: flex; flex-direction: column; gap: 8px; }
-.pv2-skel-line { height: 10px; background: linear-gradient(90deg, var(--hx-gold-faint), transparent); }
+.pv2-skel-line { height: 10px; border-radius: 2px; background: var(--ax-sunken-2); }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────── */
 .pv2-side { min-height: 0; display: flex; flex-direction: column; }
 .pv2-side .hx-panel { height: 100%; }
-.pv2-side-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.pv2-side-head { padding: 14px 16px 10px; display: flex; gap: 12px; align-items: center; }
-.pv2-side-name { font-size: 17px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pv2 .hx-tabs { padding: 0 8px; border-bottom: 1px solid var(--hx-gold-faint); flex: none; }
-.pv2 .hx-tabs button { min-height: 36px; font-size: 11px; }
-.pv2-side-scroll { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 16px; }
-.pv2-sec-title { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.pv2-sec-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--hx-gold-dim), transparent); }
-.pv2-bars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.pv2-side .hx-panel > .hx-panel-in { padding: 0; }
+.pv2-side-body { flex: 1; min-height: 0; height: 100%; display: flex; flex-direction: column; }
+.pv2-side-head { padding: 16px 16px 12px; display: flex; gap: 14px; align-items: center; }
+.pv2-side-name { font-size: 26px; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv2 .hx-tabs { padding: 0 8px; border-bottom: 1px solid var(--hx-line); flex: none; }
+.pv2 .hx-tabs button { min-height: 40px; }
+.pv2-side-scroll { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 18px; }
+.pv2-sec-title { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.pv2-sec-title::after { content: ''; flex: 1; height: 1px; order: 1; background: var(--hx-line); }
+.pv2-sec-title > :nth-child(n + 2) { order: 2; }
+.pv2-bars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .pv2 .hx-rune.ks { width: 42px; height: 42px; }
 .pv2 .hx-rune { width: 28px; height: 28px; }
 .pv2 .hx-shards .hx-rune { width: 22px; height: 22px; }
 .pv2-stages { display: flex; flex-direction: column; gap: 10px; }
 .pv2-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.pv2-stat { padding: 6px 8px; border: 1px solid var(--hx-gold-faint); background: rgb(255 255 255 / 0.03); min-width: 0; }
-.pv2-stat .v { font-family: var(--hx-mono); font-size: 15px; font-weight: 700; color: #fff; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pv2-stat .hx-label { font-size: 9px; display: block; margin-top: 3px; }
+.pv2-stat { padding: 8px 10px; border: 1px solid var(--hx-line-soft); border-radius: var(--ax-r-ctl); background: var(--hx-panel-2); min-width: 0; }
+.pv2-stat .v { font-family: var(--hx-display); font-size: 20px; font-weight: 700; color: #fff; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv2-stat .hx-label { font-size: 11px; display: block; margin-top: 3px; }
 .pv2-matches { display: flex; flex-direction: column; gap: 4px; }
 .pv2-match {
   display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center;
-  padding: 5px 8px; border-left: 2px solid var(--hx-faint); background: rgb(255 255 255 / 0.03);
+  padding: 6px 10px; border-left: 3px solid var(--hx-faint); border-radius: var(--ax-r-chip); background: var(--hx-panel-2);
 }
-.pv2-match.win { border-left-color: var(--hx-green); background: rgb(77 187 99 / 0.08); }
-.pv2-match.loss { border-left-color: var(--hx-crimson); background: rgb(225 36 46 / 0.08); }
-.pv2-match .k { font-family: var(--hx-mono); font-size: 12px; font-weight: 700; white-space: nowrap; }
-.pv2-empty { font-size: 12px; color: var(--hx-faint); }
+.pv2-match.win { border-left-color: var(--hx-green); }
+.pv2-match.loss { border-left-color: var(--hx-neg); }
+.pv2-match .k { font-family: var(--hx-mono); font-size: 13.5px; font-weight: 700; white-space: nowrap; }
+.pv2-empty { font-size: 13px; color: var(--hx-muted); }
 
 @media (prefers-reduced-motion: reduce) {
   .pv2-skel { animation: none; }

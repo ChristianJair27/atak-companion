@@ -1,4 +1,4 @@
-// src/views/PlayersView.tsx — F8: roster 5v5 con piel hextech (cliente de League).
+// src/views/PlayersView.tsx — F8: roster 5v5 con kit Arena (cliente de League).
 // Columnas de slots trapezoidales (azul | rojo) + sidebar central con el build
 // OP.GG del jugador seleccionado (árbol de runas, skills, items por etapa) y su
 // perfil (rango, WR, stats en el campeón, últimas partidas). Mismo wiring de
@@ -142,8 +142,9 @@ const SIDE: Variants = {
   exit: swap.exit,
 };
 const HEAD_IN = { duration: 0.3, ease: EASE };
-const KDA_COLORS = { k: 'var(--hx-green)', d: 'var(--hx-crimson)', a: 'var(--hx-blue)' };
-const wrColor = (wr: number | null | undefined) => (wr != null && wr >= 50 ? 'var(--hx-green)' : 'var(--hx-crimson)');
+// Arena: K y A neutros, solo las muertes van en rojo; verde / rojo = sobre o bajo 50 %.
+const KDA_COLORS = { k: 'var(--hx-ink)', d: 'var(--hx-neg)', a: 'var(--hx-ink)' };
+const wrColor = (wr: number | null | undefined) => (wr != null && wr >= 50 ? 'var(--hx-green)' : 'var(--hx-neg)');
 
 /** Cruza (fade + 4px) el contenido cuando cambia `id`. Con `appear` también entra al montar. */
 function Crossfade({ id, children, style, appear }: { id: string; children: ReactNode; style?: CSSProperties; appear?: boolean }) {
@@ -209,12 +210,12 @@ function FormBars({ matches }: { matches: RecentMatch[] }) {
         const won = m.win === true;
         const lost = m.win === false;
         const h = won || lost ? 18 : 8;
-        const color = won ? 'var(--hx-green)' : lost ? 'var(--hx-crimson)' : 'rgb(255 255 255 / 0.18)';
+        const color = won ? 'var(--hx-green)' : lost ? 'var(--hx-neg)' : 'rgb(255 255 255 / 0.18)';
         return (
           <motion.i
             key={m.id || i}
             title={`${m.championName} · ${m.result}`}
-            style={{ height: h, background: color, boxShadow: won || lost ? `0 0 6px ${won ? 'rgb(77 187 99 / 0.4)' : 'rgb(225 36 46 / 0.4)'}` : undefined }}
+            style={{ height: h, background: color }}
             initial={{ opacity: 0, scaleY: 0 }}
             animate={{ opacity: 1, scaleY: 1 }}
             transition={{ duration: 0.3, ease: EASE, delay: 0.1 + i * 0.04 }}
@@ -267,7 +268,7 @@ function PlayerSlot({
           <HxHex
             src={champFaceUrl(patch, p.championName)}
             size={54}
-            tone={selected ? 'cyan' : enemy ? 'crimson' : undefined}
+            tone={selected ? 'cyan' : undefined}
             letter={(p.championName || '?').charAt(0).toUpperCase()}
           />
           <span className="pv2-lvl hx-mono">{liveP?.level ?? p.level}</span>
@@ -296,7 +297,7 @@ function PlayerSlot({
             <span className="hx-slot-sub">{p.championName}{p.position ? ` · ${posEs(p.position)}` : ''}</span>
             {(p.isMe || !!og?.tags?.length) && (
               <span className="pv2-tags">
-                {p.isMe && <span className="hx-pill cyan">Tú</span>}
+                {p.isMe && <span className="hx-pill you">Tú</span>}
                 {(og?.tags || []).map((t) => (
                   <span key={t} className={cx('hx-pill', t === 'TILT?' || t === 'POCAS PARTIDAS' ? 'miss' : t === 'ON FIRE' || t === 'RACHA' ? 'ok' : 'gold')}>{t}</span>
                 ))}
@@ -378,14 +379,14 @@ function TeamColumn({
   return (
     <motion.div variants={rise} className="pv2-col">
       <div className={cx('pv2-colhead', side)}>
-        <span className="dot" style={{ background: blue ? 'var(--hx-blue)' : 'var(--hx-crimson)', boxShadow: `0 0 10px ${blue ? 'var(--hx-blue)' : 'var(--hx-crimson)'}` }} />
-        <span className={cx('hx-display', blue ? 'hx-chrome' : '')} style={{ fontSize: 13, letterSpacing: '0.16em', color: blue ? undefined : 'var(--hx-crimson)' }}>
+        <span className="dot" style={{ background: blue ? 'var(--hx-blue)' : 'var(--hx-crimson)' }} />
+        <span className={cx('hx-chrome pv2-colhead-title', !blue && 'red')}>
           {blue ? 'LADO AZUL' : 'LADO ROJO'}
         </span>
         <span className="sp" />
         {avgWr != null && (
           <span className="hx-label">
-            WR media <b className="hx-mono" style={{ color: wrColor(avgWr), fontSize: 12 }}>{avgWr}%</b>
+            WR media <b className="hx-mono" style={{ color: wrColor(avgWr), fontSize: 14 }}>{avgWr}%</b>
           </span>
         )}
       </div>
@@ -432,7 +433,7 @@ function Section({ title, right, children }: { title: string; right?: ReactNode;
   return (
     <motion.div variants={fade}>
       <div className="pv2-sec-title">
-        <span className="hx-label gold">{title}</span>
+        <span className="hx-label head">{title}</span>
         {right}
       </div>
       {children}
@@ -458,12 +459,12 @@ function BuildTab({ build, patch, owned, loading, champ, pos }: {
           <>
             <motion.div variants={fade}>
               <div className="pv2-sec-title">
-                <span className="hx-label gold">Meta · {champ || '—'} · {posEs(pos) || 'ALL'}</span>
-                {build.tier != null && <span className="hx-pill cyan">Tier {build.tier}</span>}
+                <span className="hx-label head">Meta · {champ || '—'} · {posEs(pos) || 'ALL'}</span>
+                {build.tier != null && <span className="hx-pill">Tier {build.tier}</span>}
               </div>
               <div className="pv2-bars">
                 <HxBar label="Win rate" value={build.win_rate != null ? `${(build.win_rate * 100).toFixed(1)}%` : '—'} pct={(build.win_rate ?? 0) * 100} color={wrColor((build.win_rate ?? 0) * 100)} delay={0.1} />
-                <HxBar label="Pick rate" value={build.pick_rate != null ? `${(build.pick_rate * 100).toFixed(1)}%` : '—'} pct={Math.min(100, (build.pick_rate ?? 0) * 100 * 4)} color="var(--hx-cyan)" delay={0.15} />
+                <HxBar label="Pick rate" value={build.pick_rate != null ? `${(build.pick_rate * 100).toFixed(1)}%` : '—'} pct={Math.min(100, (build.pick_rate ?? 0) * 100 * 4)} color="var(--hx-blue)" delay={0.15} />
                 <HxBar label="Ban rate" value={build.ban_rate != null ? `${(build.ban_rate * 100).toFixed(1)}%` : '—'} pct={Math.min(100, (build.ban_rate ?? 0) * 100 * 4)} color="var(--hx-crimson)" delay={0.2} />
               </div>
             </motion.div>
@@ -482,7 +483,7 @@ function BuildTab({ build, patch, owned, loading, champ, pos }: {
             )}
 
             {!!build.skill_order.length && (
-              <Section title="Orden de habilidades" right={<span className="hx-mono" style={{ fontSize: 11, color: 'var(--hx-gold-bright)' }}>{build.skill_order.slice(0, 3).join(' › ')}</span>}>
+              <Section title="Orden de habilidades" right={<span className="hx-mono" style={{ fontSize: 13, fontWeight: 700, color: 'var(--hx-ink)' }}>{build.skill_order.slice(0, 3).join(' › ')}</span>}>
                 <HxSkillGrid sequence={build.skill_order} />
               </Section>
             )}
@@ -533,7 +534,7 @@ function ProfileTab({ p, patch }: { p: PlayerRow; patch: PatchInfo | null }) {
   const kdaOf = (m: RecentMatch) => (m.deaths === 0 ? 'Perfect' : ((m.kills + m.assists) / m.deaths).toFixed(2));
   return (
     <motion.div key="perfil" variants={SIDE} initial="hidden" animate="show" exit="exit" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <Section title="Clasificatoria" right={og?.error ? <span className="hx-label" style={{ color: 'var(--hx-crimson)' }}>{og.error}</span> : null}>
+      <Section title="Clasificatoria" right={og?.error ? <span className="hx-label red">{og.error}</span> : null}>
         <div className="pv2-stat-grid">
           <Stat v={rank?.tier ? `${rank.tier}${rank.division && String(rank.division) !== '0' ? ` ${rank.division}` : ''}` : '—'} k="Rango" color="var(--hx-gold-bright)" />
           <Stat v={rank?.lp != null ? rank.lp : '—'} k="LP" />
@@ -547,7 +548,7 @@ function ProfileTab({ p, patch }: { p: PlayerRow; patch: PatchInfo | null }) {
           <div className="pv2-stat-grid">
             <Stat v={stat.play} k="Partidas" />
             <Stat v={`${stat.win_rate}%`} k="Win rate" color={wrColor(stat.win_rate)} />
-            <Stat v={stat.kda} k="KDA" color="var(--hx-gold-bright)" />
+            <Stat v={stat.kda} k="KDA" />
             <Stat v={`${stat.avg_kills}/${stat.avg_deaths}/${stat.avg_assists}`} k="K/D/A med." small />
           </div>
         ) : (
@@ -582,9 +583,9 @@ function ProfileTab({ p, patch }: { p: PlayerRow; patch: PatchInfo | null }) {
                   <HxHex src={champFaceUrl(patch, m.championName, m.championId)} size={26} tone="dim" letter={(m.championName || '?').charAt(0)} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'baseline', minWidth: 0 }}>
-                      <span className="hx-mono" style={{ fontSize: 11, fontWeight: 700, color: won ? 'var(--hx-green)' : lost ? 'var(--hx-crimson)' : 'var(--hx-faint)' }}>{won ? 'V' : lost ? 'D' : '—'}</span>
-                      <span className="hx-display" style={{ fontSize: 12, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.championName || '—'}</span>
-                      <span className="hx-label" style={{ letterSpacing: '0.1em' }}>{QUEUE_SHORT[m.gameType] || m.gameType || ''}</span>
+                      <span className="hx-mono" style={{ fontSize: 13, fontWeight: 700, color: won ? 'var(--hx-green)' : lost ? 'var(--hx-neg)' : 'var(--hx-faint)' }}>{won ? 'V' : lost ? 'D' : '—'}</span>
+                      <span className="hx-display" style={{ fontSize: 15, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.championName || '—'}</span>
+                      <span className="hx-label">{QUEUE_SHORT[m.gameType] || m.gameType || ''}</span>
                     </div>
                     <div style={{ display: 'flex', gap: 2, marginTop: 3 }}>
                       {(m.items.length ? m.items : [0, 0, 0, 0, 0, 0]).slice(0, 6).map((id, j) => <HxItem key={j} patch={patch} id={id} size={16} />)}
@@ -596,7 +597,7 @@ function ProfileTab({ p, patch }: { p: PlayerRow; patch: PatchInfo | null }) {
                       <span style={{ color: KDA_COLORS.d }}>{m.deaths}</span><span style={{ color: 'var(--hx-faint)' }}>/</span>
                       <span style={{ color: KDA_COLORS.a }}>{m.assists}</span>
                     </div>
-                    <div className="hx-label" style={{ letterSpacing: '0.08em' }}>
+                    <div className="hx-label">
                       KDA {kdaOf(m)} · <span className="hx-mono">{m.gameLength > 0 ? fmtClock(m.gameLength) : '—'}</span>
                     </div>
                   </div>
@@ -639,7 +640,7 @@ function Sidebar({
                   <HxHex src={champFaceUrl(patch, p.championName)} size={62} tone={p.isMe ? 'cyan' : enemy ? 'crimson' : undefined} letter={(p.championName || '?').charAt(0).toUpperCase()} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="hx-display hx-chrome pv2-side-name" title={p.riotId}>{p.name || p.riotId}</div>
-                    <div className="hx-label" style={{ marginTop: 3, color: enemy ? 'var(--hx-crimson)' : p.isMe ? 'var(--hx-cyan)' : 'var(--hx-blue)' }}>
+                    <div className="hx-label" style={{ marginTop: 4, color: enemy ? 'var(--hx-crimson-hi)' : p.isMe ? 'var(--hx-ink)' : 'var(--hx-blue)' }}>
                       {p.championName}{p.position ? ` · ${posEs(p.position)}` : ''}{p.isMe ? ' · Tú' : enemy ? ' · Enemigo' : ' · Aliado'}
                     </div>
                     <div style={{ marginTop: 6, minHeight: 28, display: 'flex', alignItems: 'center' }}>
@@ -650,7 +651,7 @@ function Sidebar({
                       )}
                     </div>
                   </div>
-                  <HxRing pct={wr ?? 0} size={58} stroke={4} color={wrColor(wr)} value={wr != null ? `${wr}%` : '—'} label="WR" />
+                  <HxRing pct={wr ?? 0} size={60} stroke={4} color={wrColor(wr)} value={wr != null ? `${wr}%` : '—'} label="WR" />
                 </motion.div>
 
                 <HxTabs value={tab} options={SIDE_TABS} onChange={onTab} />
@@ -670,7 +671,7 @@ function Sidebar({
             ) : (
               <div className="pv2-side-scroll">
                 <motion.div variants={fade} className={cx(loading && 'pv2-skel')}>
-                  <div className="hx-label gold" style={{ marginBottom: 10 }}>{loading ? 'Consultando OP.GG…' : 'Sin partida activa'}</div>
+                  <div className="hx-label head" style={{ marginBottom: 10 }}>{loading ? 'Consultando OP.GG…' : 'Sin partida activa'}</div>
                   <div className="pv2-skel-lines">
                     <span className="pv2-skel-line" style={{ width: '55%' }} />
                     <span className="pv2-skel-line" style={{ width: '80%' }} />
@@ -756,10 +757,10 @@ export default function PlayersView() {
           animate={{ opacity: 1, y: 0 }}
           transition={HEAD_IN}
         >
-          <span className="hx-wordmark hx-goldtext">ATAK</span>
-          <span className="hx-label gold" style={{ fontSize: 11 }}>Jugadores · F8</span>
+          <span className="hx-wordmark">ATAK<em>.GG</em></span>
+          <span className="hx-label" style={{ color: 'var(--hx-ink)' }}>Jugadores · F8</span>
           <span className="pv2-clock hx-mono">{fmtClock(live?.state?.gameTime ?? data?.gameTime ?? 0)}</span>
-          <span className="hx-label" style={{ color: 'var(--hx-faint)' }}>
+          <span className="hx-label" style={{ letterSpacing: '0.05em' }}>
             {data?.region || '…'}{patch?.version ? ` · Patch ${patch.version}` : ''} · arrastra para mover
           </span>
         </motion.div>

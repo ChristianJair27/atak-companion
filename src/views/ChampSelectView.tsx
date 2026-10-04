@@ -1,5 +1,5 @@
-// src/views/ChampSelectView.tsx — Champ select con la piel del cliente de League
-// (hextech.css) y la densidad de Blitz: campeón 3D en el centro, árbol de
+// src/views/ChampSelectView.tsx — Champ select con el kit "Arena" (hextech.css,
+// el lenguaje del sitio ATAK.GG) y la densidad de Blitz: campeón 3D en el centro, árbol de
 // runas completo, grilla de skills, items por etapas y sugerencias de pick en
 // vivo. Datos reales: LCU (draft) + OP.GG (build/matchup/sugerencias).
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -54,10 +54,11 @@ const centerCol = {
   hidden: { opacity: 0, scale: 0.985 },
   show: { opacity: 1, scale: 1, transition: { duration: 0.6, ease: EASE } },
 };
+// Título: entra deslizando (solo transform + opacity).
 const title = {
-  initial: { opacity: 0, letterSpacing: '0.42em', filter: 'blur(8px)' },
-  animate: { opacity: 1, letterSpacing: '0.12em', filter: 'blur(0px)', transition: { duration: 0.6, ease: EASE } },
-  exit: { opacity: 0, letterSpacing: '0.2em', filter: 'blur(4px)', transition: { duration: 0.18, ease: EASE } },
+  initial: { opacity: 0, x: -20 },
+  animate: { opacity: 1, x: 0, transition: { duration: 0.45, ease: EASE } },
+  exit: { opacity: 0, x: 10, transition: { duration: 0.18, ease: EASE } },
 };
 const PHASES = ['PLANEACIÓN', 'BANEOS', 'PICKS', 'FINAL'];
 const PHASE_TITLES = ['PLANEACIÓN', 'FASE DE BANEOS', 'FASE DE PICKS', 'DRAFT CERRADO'];
@@ -104,11 +105,11 @@ function phaseIndex(phase: string, actionType: string): number {
 
 type CompKey = 'ad' | 'ap' | 'tank' | 'engage' | 'assassin';
 const COMP_META: Array<{ key: CompKey; label: string; icon: ReactNode; need: number }> = [
-  { key: 'ad', label: 'AD', icon: <IconSword size={11} color="#e8a84a" />, need: 1 },
-  { key: 'ap', label: 'AP', icon: <IconSpark size={11} color="#6db3ff" />, need: 1 },
-  { key: 'tank', label: 'TANK', icon: <IconShield size={11} color="#8fd99e" />, need: 1 },
-  { key: 'engage', label: 'ENGAGE', icon: <IconFist size={11} color="#c9cdd6" />, need: 1 },
-  { key: 'assassin', label: 'ASESINO', icon: <IconSword size={11} color="#ff9aa0" />, need: 0 },
+  { key: 'ad', label: 'AD', icon: <IconSword size={11} color="currentColor" />, need: 1 },
+  { key: 'ap', label: 'AP', icon: <IconSpark size={11} color="currentColor" />, need: 1 },
+  { key: 'tank', label: 'TANK', icon: <IconShield size={11} color="currentColor" />, need: 1 },
+  { key: 'engage', label: 'ENGAGE', icon: <IconFist size={11} color="currentColor" />, need: 1 },
+  { key: 'assassin', label: 'ASESINO', icon: <IconSword size={11} color="currentColor" />, need: 0 },
 ];
 function classifyTags(tags: string[]): CompKey[] {
   const t = tags.map((x) => x.toLowerCase());
@@ -158,7 +159,7 @@ function PlayerSlot({ p, patch, side, rival, onClick }: {
         {spells.length > 0 && <HxSlotMini patch={patch} spells={spells} />}
         <AnimatePresence initial={false} mode="popLayout">
           <motion.span key={name || 'empty'} {...xfade} style={{ display: 'inline-flex' }}>
-            <HxHex src={face} size={46} tone={name ? (p.acting ? 'cyan' : p.isLocal ? 'crimson' : undefined) : 'dim'} letter="?" />
+            <HxHex src={face} size={44} tone={name ? (p.acting ? 'cyan' : p.isLocal ? 'crimson' : undefined) : 'dim'} letter="?" />
           </motion.span>
         </AnimatePresence>
         <div style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -167,14 +168,14 @@ function PlayerSlot({ p, patch, side, rival, onClick }: {
             {name || 'ESPERANDO…'}
           </motion.div>
           <div className="hx-slot-sub" style={{ marginTop: 0 }}>
-            {p.summonerName ? <span style={{ color: 'var(--hx-ink)', textTransform: 'none', letterSpacing: '0.02em' }}>{p.summonerName}</span> : null}
+            {p.summonerName ? <span style={{ color: 'var(--hx-ink)', textTransform: 'none', letterSpacing: '0.01em' }}>{p.summonerName}</span> : null}
             {p.summonerName ? ' · ' : ''}{posEs(p.position || '') || (p.summonerName ? '' : '—')}
             {Array.isArray(p.tags) && p.tags[0] ? ` · ${tagEs(p.tags[0])}` : ''}{p.isLocal ? ' · TÚ' : ''}{rival ? ' · TU RIVAL' : ''}
           </div>
           {(rank || p.mastery || (name && meta)) && (
             <div className="cs-slot-pills" style={{ display: 'flex', gap: 3, flexWrap: 'wrap', justifyContent: right ? 'flex-end' : 'flex-start', marginTop: 1 }}>
               {rank && (
-                <span className="hx-pill" style={{ color: TIER_COLOR[tierKey] || 'var(--hx-muted)', borderColor: `${TIER_COLOR[tierKey] || '#888'}66`, textTransform: 'none', letterSpacing: '0.04em' }}>
+                <span className="hx-pill" style={{ ['--c' as any]: TIER_COLOR[tierKey] || 'var(--hx-ink-2)', textTransform: 'none' }}>
                   {TIER_ES[tierKey] || rank.tier}{rank.division && rank.division !== 'NA' ? ` ${rank.division}` : ''} · {rank.lp} LP
                 </span>
               )}
@@ -417,20 +418,20 @@ export default function ChampSelectView() {
     <div className="no-drag" onClick={() => openChampionPage(champSlug(patch, asText(c)))} title={`${asText(c)} — ver en ATAK.GG`} style={{ textAlign: 'center', cursor: 'pointer' }}>
       <HxHex src={champFaceUrl(patch, asText(c), Number(c?.id) || 0)} size={38} tone={bad ? 'crimson' : undefined} />
       {typeof c?.winRate === 'number' && (
-        <div className="hx-mono" style={{ fontSize: 9, color: bad ? '#ff9aa0' : '#8fd99e', marginTop: 2 }}>{c.winRate}%</div>
+        <div className="hx-mono" style={{ fontSize: 12, fontWeight: 700, color: bad ? 'var(--hx-neg)' : 'var(--hx-green)', marginTop: 3 }}>{c.winRate}%</div>
       )}
     </div>
   );
 
   return (
-    <div className="hx hx-stage" style={{ width: '100vw', height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: 'inset 0 0 0 1px var(--hx-gold-faint)' }}>
+    <div className="hx hx-stage" style={{ width: '100vw', height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: 'inset 0 0 0 1px var(--hx-line)' }}>
       {/* Fondo: splash con Ken Burns + crossfade */}
       <AnimatePresence>
         {bgSplash && (
           <motion.div key={bgSplash} {...xfade} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
             <motion.img src={bgSplash} alt="" initial={{ scale: 1.14 }} animate={{ scale: 1.06 }} transition={{ duration: 14, ease: 'linear' }}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%', opacity: name ? 0.62 : 0.4, filter: 'saturate(0.95) brightness(0.7)' }} />
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,rgba(7,10,18,.55) 0%,rgba(7,10,18,.25) 30%,rgba(7,10,18,.15) 50%,rgba(7,10,18,.25) 70%,rgba(7,10,18,.55) 100%), linear-gradient(180deg,rgba(7,10,18,.15) 0%,rgba(7,10,18,.55) 70%,#070A12 100%)' }} />
+              style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%', opacity: name ? 0.5 : 0.34, filter: 'saturate(0.95) brightness(0.7)' }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,rgba(10,10,12,.7) 0%,rgba(10,10,12,.35) 30%,rgba(10,10,12,.25) 50%,rgba(10,10,12,.35) 70%,rgba(10,10,12,.7) 100%), linear-gradient(180deg,rgba(10,10,12,.2) 0%,rgba(10,10,12,.65) 65%,#0a0a0c 100%)' }} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -439,7 +440,7 @@ export default function ChampSelectView() {
       {/* Rótulo de capítulo + flash de cierre */}
       <AnimatePresence>
         {chapter && (
-          <motion.div key={chapter} {...title} className="hx-chrome" style={{ position: 'absolute', left: 0, right: 0, top: '40%', zIndex: 6, pointerEvents: 'none', textAlign: 'center', fontWeight: 700, fontSize: 52, textTransform: 'uppercase', textShadow: '0 6px 30px rgba(0,0,0,.9)' }}>
+          <motion.div key={chapter} {...title} className="hx-chrome cs-chapter">
             {chapter}
           </motion.div>
         )}
@@ -453,13 +454,13 @@ export default function ChampSelectView() {
 
       {/* ── Barra superior (arrastrable) ── */}
       <motion.header className="hx-topbar cs-sweep" variants={rise} initial="hidden" animate="show" style={{ position: 'relative', zIndex: 5 }}>
-        <span className="hx-wordmark hx-chrome">ATAK</span>
+        <span className="hx-wordmark">ATAK<em>.GG</em></span>
         <HxTabs<Tab> className="no-drag" value={tab} onChange={setTab} options={[{ id: 'picks', label: 'Sugerencias de pick' }, { id: 'builds', label: 'Builds' }]} />
-        <span className="hx-muted" style={{ fontSize: 12, letterSpacing: '0.06em' }}>
+        <span className="hx-muted" style={{ fontSize: 13 }}>
           {cs ? (timerSecs > 0 ? `${timerSecs} segundos restantes…` : 'esperando al cliente…') : 'sin champ select'}
         </span>
         <span style={{ flex: 1 }} />
-        {myPos && <span className="hx-pill gold">{posEs(myPos)}</span>}
+        {myPos && <span className="hx-pill">{posEs(myPos)}</span>}
         <button type="button" className="hx-icon-btn close" onClick={() => window.atak.win('close')} aria-label="Cerrar">
           <svg width="11" height="11" viewBox="0 0 10 10"><path d="M1.5 1.5 L8.5 8.5 M8.5 1.5 L1.5 8.5" stroke="currentColor" strokeWidth="1.3" /></svg>
         </button>
@@ -471,20 +472,20 @@ export default function ChampSelectView() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
           {PHASES.map((label, i) => (
             <span key={label} style={{ display: 'contents' }}>
-              <span style={{ position: 'relative', fontSize: 11, letterSpacing: '0.18em', fontWeight: i === idx ? 700 : 600, color: i === idx ? '#fff' : i < idx ? 'var(--hx-muted)' : 'var(--hx-faint)', paddingBottom: 3 }}>
+              <span className={`cs-phase${i === idx ? ' on' : i < idx ? ' done' : ''}`}>
                 {label}
-                {i === idx && <motion.span layoutId="cs-phase-underline" transition={{ duration: 0.3, ease: EASE }} style={{ position: 'absolute', left: 0, right: 0, bottom: -1, height: 2, background: 'var(--hx-crimson)' }} />}
+                {i === idx && <motion.span layoutId="cs-phase-underline" transition={{ duration: 0.3, ease: EASE }} className="cs-phase-line" />}
               </span>
-              {i < PHASES.length - 1 && <span style={{ width: 24, height: 1, background: 'var(--hx-gold-faint)' }} />}
+              {i < PHASES.length - 1 && <span className="cs-phase-gap" />}
             </span>
           ))}
-          <span style={{ width: 1, height: 22, background: 'var(--hx-gold-faint)', margin: '0 6px' }} />
+          <span style={{ width: 1, height: 22, background: 'var(--hx-line)', margin: '0 6px' }} />
           <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-            <span className={'hx-mono' + (cs && timerSecs > 0 && timerSecs <= 10 ? ' cs-timer-urgent' : '')} style={{ fontWeight: 700, fontSize: 18, color: 'var(--hx-crimson)', border: '1px solid rgba(225,36,46,.5)', padding: '0 10px', lineHeight: '24px', display: 'inline-flex' }}>
+            <span className={'cs-timer' + (cs && timerSecs > 0 && timerSecs <= 10 ? ' cs-timer-urgent' : '')}>
               {cs ? (timerSecs <= 10 ? <Blip value={fmtClock(timerSecs)} /> : fmtClock(timerSecs)) : '—'}
             </span>
-            <span style={{ width: 88, height: 3, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>
-              <span className="cs-timer-fill" style={{ display: 'block', width: `${timerPct}%`, background: 'linear-gradient(90deg,#7d1017,#E1242E)' }} />
+            <span className="cs-timer-rail">
+              <span className="cs-timer-fill" style={{ display: 'block', width: `${timerPct}%` }} />
             </span>
           </span>
         </div>
@@ -495,8 +496,8 @@ export default function ChampSelectView() {
       <motion.main variants={staggerParent(0.04, 0.04)} initial="hidden" animate="show" style={{ position: 'relative', zIndex: 3, flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '300px 1fr 300px', gap: 12, padding: 12 }}>
         {/* ALIADOS */}
         <motion.aside variants={slideCol(-32)} style={{ display: 'flex', flexDirection: 'column', gap: 6, minHeight: 0, overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 7, height: 7, transform: 'rotate(45deg)', background: 'var(--hx-blue)', boxShadow: '0 0 8px var(--hx-blue)' }} />
+          <div className="cs-side">
+            <i />
             <span className="hx-label blue">Tu equipo</span>
           </div>
           {allySlots.slice(0, 5).map((p, i) => <PlayerSlot key={p.cellId ?? `empty-${i}`} p={p} patch={patch} side="left" />)}
@@ -509,7 +510,7 @@ export default function ChampSelectView() {
                 return <span key={m.key} className={`hx-pill${n >= Math.max(1, m.need) ? ' ok' : ''}${miss ? ' miss' : ''}`}>{m.icon}<span>{m.label}</span><Blip className="n" value={n} /></span>;
               })}
             </div>
-            {comp.missing.length > 0 && <div style={{ marginTop: 4, fontSize: 10.5, color: '#ff9aa0' }}>Falta: <b>{comp.missing.join(' · ')}</b></div>}
+            {comp.missing.length > 0 && <div style={{ marginTop: 5, fontSize: 12, color: 'var(--hx-neg)' }}>Falta: <b>{comp.missing.join(' · ')}</b></div>}
           </HxPanel>
         </motion.aside>
 
@@ -536,15 +537,15 @@ export default function ChampSelectView() {
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10, minWidth: 0 }}>
               <div>
                 <AnimatePresence mode="wait" initial={false}>
-                  <motion.div key={name || 'none'} {...title} className="hx-chrome" style={{ fontWeight: 700, fontSize: name ? 44 : 30, textTransform: 'uppercase', lineHeight: 1.05, textShadow: '0 4px 24px rgba(0,0,0,.8)' }}>
+                  <motion.div key={name || 'none'} {...title} className="hx-chrome cs-hero-title" style={{ fontSize: name ? 60 : 44 }}>
                     {name || 'Elige campeón'}
                   </motion.div>
                 </AnimatePresence>
                 <div style={{ marginTop: 4, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                  {myPos && <span className="hx-label gold" style={{ fontSize: 11 }}>{posEs(myPos)}{tags[0] ? ` · ${tagEs(tags[0])}` : ''}</span>}
+                  {myPos && <span className="hx-label" style={{ color: 'var(--hx-ink)' }}>{posEs(myPos)}{tags[0] ? ` · ${tagEs(tags[0])}` : ''}</span>}
                   {build?.source === 'opgg' && <span className="hx-label">Meta OP.GG</span>}
                   {patch?.version && <span className="hx-label">Parche {String(patch.version).split('.').slice(0, 2).join('.')}</span>}
-                  {previewing && <span className="hx-pill gold">Vista previa</span>}
+                  {previewing && <span className="hx-pill">Vista previa</span>}
                 </div>
               </div>
               {(wrNum != null || pickNum != null || banNum != null) && (
@@ -571,7 +572,7 @@ export default function ChampSelectView() {
                   <AnimatePresence>
                     {feedback && (
                       <motion.span key="fb" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0, transition: { duration: 0.25, ease: EASE } }} exit={{ opacity: 0, transition: { duration: 0.15 } }}
-                        style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: feedback.ok ? '#8fd99e' : '#ff9aa0' }}>
+                        style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: '0.04em', color: feedback.ok ? 'var(--hx-green)' : 'var(--hx-neg)' }}>
                         {feedback.msg}
                       </motion.span>
                     )}
@@ -588,12 +589,12 @@ export default function ChampSelectView() {
                 <motion.div key="picks" {...swap} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <HxPanel corners className="no-drag">
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
-                      <span className="hx-label gold">
+                      <span className="hx-label head">
                         Sugerencias de pick{myPos ? ` · ${posEs(myPos)}` : ''}
                         <span className="hx-faint" style={{ marginLeft: 8, fontWeight: 500 }}>{rival ? `· vs ${rival} · clic = hover + runas` : '· clic = hover + runas'}</span>
-                        {refining && <span style={{ marginLeft: 8, color: 'var(--hx-gold)', fontWeight: 500 }}>· afinando con el matchup…</span>}
+                        {refining && <span className="hx-faint" style={{ marginLeft: 8, fontWeight: 500 }}>· afinando con el matchup…</span>}
                       </span>
-                      {comp.missing.length > 0 && <span style={{ fontSize: 11, color: '#ff9aa0', fontWeight: 700 }}>Falta: {comp.missing.join(' · ')}</span>}
+                      {comp.missing.length > 0 && <span style={{ fontSize: 12, color: 'var(--hx-neg)', fontWeight: 700 }}>Falta: {comp.missing.join(' · ')}</span>}
                     </div>
                     <AnimatePresence mode="wait" initial={false}>
                       {suggLoading && !bounceItems.length ? (
@@ -602,8 +603,8 @@ export default function ChampSelectView() {
                         </motion.div>
                       ) : bounceItems.length > 0 ? (
                         <motion.div key="list" {...xfade}>
-                          <BounceCards items={bounceItems} cardWidth={96} cardHeight={124} animationDelay={0.05} animationStagger={0.04} />
-                          <div className="hx-muted" style={{ marginTop: 8, fontSize: 11, textAlign: 'center' }}>{suggestions[0]?.reason || 'Meta OP.GG · se actualiza en cada pick/ban'}</div>
+                          <BounceCards items={bounceItems} cardWidth={90} cardHeight={126} rotations={[0]} lifts={[0]} animationDelay={0.05} animationStagger={0.04} />
+                          <div className="hx-muted" style={{ marginTop: 8, fontSize: 12.5, textAlign: 'center' }}>{suggestions[0]?.reason || 'Meta OP.GG · se actualiza en cada pick/ban'}</div>
                         </motion.div>
                       ) : (
                         <motion.div key="empty" {...xfade} className="hx-label" style={{ textAlign: 'center', color: 'var(--hx-faint)', padding: 8 }}>Sin sugerencias (bans/picks o OP.GG offline)</motion.div>
@@ -612,7 +613,7 @@ export default function ChampSelectView() {
                   </HxPanel>
                   {(strong.length > 0 || weak.length > 0) && (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      <HxPanel><div className="hx-label" style={{ marginBottom: 8, color: '#8fd99e' }}>Favorable</div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{strong.slice(0, 6).map((c, i) => <Counter key={i} c={c} />)}{!strong.length && <span className="hx-faint">—</span>}</div></HxPanel>
+                      <HxPanel><div className="hx-label ok" style={{ marginBottom: 8 }}>Favorable</div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{strong.slice(0, 6).map((c, i) => <Counter key={i} c={c} />)}{!strong.length && <span className="hx-faint">—</span>}</div></HxPanel>
                       <HxPanel><div className="hx-label red" style={{ marginBottom: 8 }}>Débil contra</div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{weak.slice(0, 6).map((c, i) => <Counter key={i} c={c} bad />)}</div></HxPanel>
                     </div>
                   )}
@@ -620,52 +621,52 @@ export default function ChampSelectView() {
               ) : (
                 <motion.div key={`builds:${metaKey}`} {...swap} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {build?.loading && <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', padding: 16 }}><span className="dot" /><span className="hx-label">Cargando meta OP.GG…</span></div>}
-                  {build?.error && <HxPanel tone="crimson"><span style={{ color: '#ff9aa0', fontSize: 12 }}>{String(build.error)}</span></HxPanel>}
+                  {build?.error && <HxPanel tone="crimson"><span style={{ color: 'var(--hx-neg)', fontSize: 13 }}>{String(build.error)}</span></HxPanel>}
                   {!build && !name && <div className="hx-label" style={{ textAlign: 'center', color: 'var(--hx-faint)', padding: 16 }}>Elige un campeón para ver runas y build · las sugerencias están en la otra pestaña</div>}
                   {name && <DraftAiPanel patch={patch} request={aiRequest} onRunesApplied={(r) => setFeedback({ ok: r.ok, msg: r.ok ? 'Runas IA puestas en el cliente' : r.error || 'El cliente rechazó la página' })} />}
                   {runes && (
                     <HxPanel corners>
                       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
-                        <span className="hx-label gold" style={{ fontSize: 11 }}>{mu?.source === 'matchup' ? `Runas vs ${String(mu.rival)}` : 'Runas'} <span className="hx-faint" style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>· estadística OP.GG</span></span>
-                        {mu && <span className="hx-faint" style={{ fontSize: 10, letterSpacing: '0.06em' }}>{mu.source === 'matchup' ? `${mu.runesPlay} partidas del duelo${mu.runesWinRate != null ? ` · ${mu.runesWinRate}% WR` : ''}` : `sin muestra vs ${mu.rival} · meta de línea`}</span>}
+                        <span className="hx-label head">{mu?.source === 'matchup' ? `Runas vs ${String(mu.rival)}` : 'Runas'} <span className="hx-faint" style={{ fontFamily: 'var(--hx-data)', fontSize: 12, fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>· estadística OP.GG</span></span>
+                        {mu && <span className="hx-muted" style={{ fontSize: 12 }}>{mu.source === 'matchup' ? `${mu.runesPlay} partidas del duelo${mu.runesWinRate != null ? ` · ${mu.runesWinRate}% WR` : ''}` : `sin muestra vs ${mu.rival} · meta de línea`}</span>}
                       </div>
                       <HxRuneTree patch={patch} primaryPathId={Number(runes.primaryPathId) || 0} secondaryPathId={Number(runes.secondaryPathId) || 0} selected={runeIds.slice(0, 6)} shards={runeIds.slice(6, 9)} />
-                      {mu?.tip && <div style={{ marginTop: 10, fontSize: 11.5, lineHeight: 1.45, color: 'var(--hx-ink)', borderLeft: '2px solid var(--hx-gold)', paddingLeft: 10 }}><b style={{ color: 'var(--hx-gold)', marginRight: 6 }}>VS {String(mu.rival).toUpperCase()} (EN)</b>{mu.tip}</div>}
+                      {mu?.tip && <div className="cs-note hot" style={{ marginTop: 10 }}><b>VS {String(mu.rival).toUpperCase()} (EN)</b>{mu.tip}</div>}
                     </HxPanel>
                   )}
                   {(skillSeq.length > 0 || skillPrio) && (
                     <HxPanel corners>
-                      <div className="hx-label gold" style={{ fontSize: 11, marginBottom: 10 }}>Orden de skills{skillPrio ? ` · ${skillPrio}` : ''}</div>
+                      <div className="hx-label head" style={{ marginBottom: 10 }}>Orden de skills{skillPrio ? ` · ${skillPrio}` : ''}</div>
                       {skillSeq.length > 3 ? <HxSkillGrid sequence={skillSeq} /> : (
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          {skillSeq.map((k, i) => <span key={i} style={{ display: 'contents' }}><span className="hx-pill gold">{k.toUpperCase()}</span>{i < skillSeq.length - 1 && <HxArrow />}</span>)}
+                          {skillSeq.map((k, i) => <span key={i} style={{ display: 'contents' }}><span className="hx-pill">{k.toUpperCase()}</span>{i < skillSeq.length - 1 && <HxArrow />}</span>)}
                         </div>
                       )}
                     </HxPanel>
                   )}
                   {fullBuilds.length > 0 && (
                     <HxPanel corners>
-                      <div className="hx-label gold" style={{ fontSize: 11, marginBottom: 10 }}>Build completa · cambia de variante o de pieza</div>
+                      <div className="hx-label head" style={{ marginBottom: 10 }}>Build completa · cambia de variante o de pieza</div>
                       <HxFullBuild patch={patch} builds={fullBuilds} options={itemOptions} size={34} />
                     </HxPanel>
                   )}
                   {tips.length > 0 && (
-                    <HxPanel><div className="hx-label" style={{ marginBottom: 6 }}>Consejos ATAK</div><div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>{tips.map((t, i) => <div key={i} style={{ fontSize: 11.5, lineHeight: 1.4, borderLeft: `2px solid ${i === 0 ? 'var(--hx-crimson)' : 'var(--hx-gold-dim)'}`, paddingLeft: 8 }}>{t}</div>)}</div></HxPanel>
+                    <HxPanel><div className="hx-label head" style={{ marginBottom: 8 }}>Consejos ATAK</div><div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>{tips.map((t, i) => <div key={i} className={`cs-note${i === 0 ? ' hot' : ''}`}>{t}</div>)}</div></HxPanel>
                   )}
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
-          <div className="hx-faint" style={{ flex: 'none', textAlign: 'center', fontSize: 10, letterSpacing: '0.12em' }}>
+          <div className="hx-faint" style={{ flex: 'none', textAlign: 'center', fontSize: 11.5, letterSpacing: '0.06em' }}>
             {[mu?.play ? `${mu.play} partidas del duelo` : null, build?.source === 'opgg' ? 'OP.GG' : null, patch?.version ? `Parche ${String(patch.version).split('.').slice(0, 2).join('.')}` : null].filter(Boolean).join(' · ') || 'ATAK.GG'}
           </div>
         </motion.section>
 
         {/* ENEMIGOS + hechizos + items */}
         <motion.aside variants={slideCol(32)} style={{ display: 'flex', flexDirection: 'column', gap: 6, minHeight: 0, overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+          <div className="cs-side right">
             <span className="hx-label red">Enemigo</span>
-            <span style={{ width: 7, height: 7, transform: 'rotate(45deg)', background: 'var(--hx-crimson)', boxShadow: '0 0 8px var(--hx-crimson)' }} />
+            <i />
           </div>
           {enemySlots.slice(0, 5).map((p, i) => (
             <PlayerSlot key={p.cellId ?? `empty-${i}`} p={p} patch={patch} side="right"
@@ -677,13 +678,13 @@ export default function ChampSelectView() {
               <motion.div key={metaKey} {...swap} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {spellIds.length > 0 && (
                   <HxPanel inner={{ padding: '10px 12px' }}>
-                    <div className="hx-label gold" style={{ marginBottom: 6 }}>Hechizos</div>
+                    <div className="hx-label head" style={{ marginBottom: 6 }}>Hechizos</div>
                     <div style={{ display: 'flex', gap: 6 }}>{spellIds.map((id, i) => { const u = spellIconUrl(patch, id); return <span key={i} className="hx-item" style={{ width: 30, height: 30 }}>{u && <img src={u} alt="" />}</span>; })}</div>
                   </HxPanel>
                 )}
                 {(starterIds.length > 0 || coreIds.length > 0 || fullBuilds.length > 0) && (
                   <HxPanel inner={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div className="hx-label gold">Items</div>
+                    <div className="hx-label head">Items</div>
                     <HxItemStage patch={patch} label="Inicio" ids={starterIds} size={26} />
                     {fullBuilds.length > 0 ? (
                       <div>

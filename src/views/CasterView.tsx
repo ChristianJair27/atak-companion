@@ -1,62 +1,90 @@
-// src/views/CasterView.tsx — Barra de transmisión 1920×112 superior-centro (diseño 1f).
-// Todo fuera de la barra queda transparente. El payload live no trae nombres de
-// equipo (el status.feed tampoco los expone), así que se muestran AZUL / ROJO.
-// Mejora sobre el diseño: medallones de dragones tomados coloreados por elemento.
+// src/views/CasterView.tsx — Barra de transmisión en esta PC (ventana 1920×1080
+// transparente; la barra vive arriba al centro). Mismo marcador que el overlay
+// de OBS del sitio (/broadcast/:canal/overlay) y sus dos temas:
+//  · atak — diseño Arena (Barlow Condensed en itálica, crimson).
+//  · lqc  — la liga, con la identidad de sus publicaciones: Orbitron en
+//           itálica con resplandor, JetBrains Mono y el fondo azul con "LQC".
+// El tema sale del canal guardado en el Modo caster (los "lqc…" usan el de la
+// liga); ?theme=atak|lqc lo fuerza (preview). Los nombres y logos de equipo
+// son los del formulario del Modo caster; sin ellos, AZUL / ROJO.
+import { motion } from 'framer-motion';
 import logo from '../assets/atak-logo.png';
+import { Blip, EASE } from '../motion';
+import lqcBg from '../assets/lqc-bg.webp';
+import lqcMark from '../assets/lqc-wordmark.png';
 import { BaronSvg, DragonSvg, dragonColor, fmtClock, useLive } from './shared';
 
-function HexBadge({ txt, red }: { txt: string; red?: boolean }) {
-  return (
-    <span
-      className="display"
-      style={{
-        width: 34, height: 34, flex: 'none',
-        background: red ? 'linear-gradient(135deg,#331114,#101115)' : 'linear-gradient(135deg,#23252b,#101115)',
-        display: 'grid', placeItems: 'center',
-        fontWeight: 700, fontSize: 15,
-        color: red ? 'var(--crimson-soft)' : 'var(--text)',
-        boxShadow: `0 0 0 1px ${red ? '#E1242E' : '#9ba0ab'}`,
-        clipPath: 'polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)',
-      }}
-    >
-      {txt}
-    </span>
-  );
+interface Theme {
+  id: 'atak' | 'lqc';
+  panel: string; strip: string; line: string;
+  text2: string; muted: string;
+  blue: string; blueFill: string; red: string; redFill: string; accent: string;
+  font: string; italic: boolean; scale: number;
+  /** Fuente de datos/etiquetas, fondo del marcador y resplandor de los títulos. */
+  data: string; panelImg?: string; glow?: string; stroke?: string;
+}
+const ATAK: Theme = {
+  id: 'atak',
+  panel: 'rgba(18,18,22,.97)', strip: '#0e0e11', line: 'rgba(255,255,255,.1)',
+  text2: '#b6b6c0', muted: '#8c8c98',
+  blue: '#6db3ff', blueFill: '#2a6fd6', red: '#ff5a64', redFill: '#e8323c', accent: '#e8323c',
+  font: 'var(--ax-display)', italic: true, scale: 1,
+  data: 'var(--font-data)',
+};
+const LQC: Theme = {
+  id: 'lqc',
+  panel: 'rgba(2,11,28,.97)', strip: 'rgba(1,7,18,.78)', line: 'rgba(96,165,255,.3)',
+  text2: '#bcd0ee', muted: '#86a2cc',
+  blue: '#4ea1ff', blueFill: 'linear-gradient(135deg,#0a58c8 0%,#1f7ae6 55%,#3f97ff 100%)',
+  red: '#ff6a8c', redFill: 'linear-gradient(135deg,#a50f3a 0%,#e5235a 60%,#ff3d6e 100%)', accent: '#2a86f0',
+  // Orbitron es más ancha que Barlow Condensed (se compensa el cuerpo) y no trae
+  // itálica: el navegador la inclina, como el logo de la liga.
+  font: "'Orbitron', var(--ax-display)", italic: true, scale: 0.7,
+  data: "'JetBrains Mono', var(--font-data)",
+  panelImg: `linear-gradient(rgba(1,8,22,.46), rgba(1,8,22,.46)), url(${lqcBg}) center / cover no-repeat, #020b1c`,
+  glow: '0 0 18px rgba(63,151,255,.7)', stroke: '0.03em currentColor',
+};
+
+interface CasterCfg { channel: string; team1: string; team2: string; logo1: string; logo2: string; accent: string }
+/** Config del Modo caster (la guarda MainView en localStorage, mismo origen). */
+function readCfg(): CasterCfg {
+  const base: CasterCfg = { channel: 'lqc-2026', team1: '', team2: '', logo1: '', logo2: '', accent: '' };
+  try {
+    const raw = localStorage.getItem('atak.caster.cfg');
+    if (raw) return { ...base, ...JSON.parse(raw) };
+  } catch { /* config corrupta → defaults */ }
+  return base;
 }
 
-function TimerChip(props: { label: string; icon: 'dragon' | 'baron'; nextAt: number | null; alive: boolean; gameTime: number }) {
-  const { label, icon, nextAt, alive, gameTime } = props;
+function TimerChip(props: { T: Theme; label: string; icon: 'dragon' | 'baron'; nextAt: number | null; alive: boolean; gameTime: number }) {
+  const { T, label, icon, nextAt, alive, gameTime } = props;
   const gone = nextAt == null;
   const live = alive && !gone;
   const Icon = icon === 'dragon' ? DragonSvg : BaronSvg;
   return (
     <div
-      className={`skew${live ? ' badge-glow' : ''}`}
+      className={live ? 'badge-glow' : undefined}
       style={{
-        '--skew': '10px',
-        display: 'flex', alignItems: 'center', gap: 7,
-        background: 'var(--panel-bg)',
-        border: `1px solid ${live ? 'rgba(225,36,46,.6)' : 'rgba(200,205,214,.25)'}`,
-        padding: '4px 14px',
-      } as any}
+        display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 12px', borderRadius: 4,
+        background: live ? T.accent : T.panel,
+        border: `1px solid ${live ? T.accent : T.line}`,
+      }}
     >
-      <Icon size={13} color={live ? '#E1242E' : '#9ba0ab'} />
-      <span style={{ fontSize: 11, letterSpacing: '0.14em', fontWeight: 600, color: live ? 'var(--crimson-soft)' : 'var(--text-soft)' }}>{label}</span>
-      <span className="mono" style={{ fontWeight: 700, fontSize: 13, color: live ? '#fff' : gone ? 'var(--text-faint)' : 'var(--text-soft)' }}>
-        {gone ? '—' : live ? 'AHORA' : fmtClock(nextAt - gameTime)}
+      <Icon size={13} color={live ? '#fff' : T.text2} />
+      <span style={{ fontFamily: T.data, fontSize: 12.5, letterSpacing: '0.1em', fontWeight: 700, color: live ? '#fff' : T.text2 }}>{label}</span>
+      <span style={{ fontFamily: T.font, fontStyle: T.italic ? 'italic' : 'normal', fontWeight: 800, fontSize: 19 * T.scale, lineHeight: 1, WebkitTextStroke: T.stroke, color: live ? '#fff' : gone ? T.muted : '#fff' }}>
+        {gone ? '—' : live ? 'VIVO' : fmtClock(nextAt - gameTime)}
       </span>
     </div>
   );
 }
 
-function DragonMedals({ tag, taken }: { tag: string; taken: Array<{ type: string }> }) {
+function DragonMedals({ T, color, taken, right }: { T: Theme; color: string; taken: Array<{ type: string }>; right?: boolean }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-      <span style={{ fontSize: 9.5, letterSpacing: '0.14em', color: 'var(--text-dim)', marginRight: 2 }}>{tag}</span>
-      {taken.length === 0 && <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>—</span>}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 120, justifyContent: right ? 'flex-start' : 'flex-end' }}>
       {taken.map((d, i) => (
-        <span key={i} className="medal" title={d.type}>
-          <DragonSvg size={9} color={dragonColor(d.type)} />
+        <span key={i} title={d.type} style={{ width: 28, height: 28, display: 'grid', placeItems: 'center', borderRadius: 4, background: T.panel, border: `1px solid ${T.line}`, borderBottom: `3px solid ${color}` }}>
+          <DragonSvg size={12} color={dragonColor(d.type)} />
         </span>
       ))}
     </div>
@@ -69,84 +97,90 @@ export default function CasterView() {
   const o = live?.objectives;
   if (!s || !o) return null; // transparente hasta que haya partida
 
+  const cfg = readCfg();
+  const forced = new URLSearchParams(window.location.search).get('theme');
+  const T = forced === 'atak' ? ATAK : forced === 'lqc' ? LQC : /^lqc/i.test(cfg.channel) ? LQC : ATAK;
+  const accent = /^#[0-9a-fA-F]{6}$/.test(cfg.accent) ? cfg.accent : T.accent;
+  const disp = (px: number): React.CSSProperties => ({
+    fontFamily: T.font, fontStyle: T.italic ? 'italic' : 'normal', fontWeight: 800,
+    fontSize: px * T.scale, lineHeight: 1, letterSpacing: '0.02em', textTransform: 'uppercase',
+    textShadow: T.glow, WebkitTextStroke: T.stroke,
+  });
+
   const players: any[] = s.players || [];
   const blue = players.filter((p) => p.team === 'ORDER');
   const red = players.filter((p) => p.team !== 'ORDER');
-  const kills = (arr: any[]) => arr.reduce((a, p) => a + (p.kills || 0), 0);
+  const sum = (arr: any[], k: string) => arr.reduce((a, p) => a + (p[k] || 0), 0);
   const taken: Array<{ team: string | null; type: string }> = o.dragon?.taken || [];
-  const blueDragons = taken.filter((d) => d.team === 'ORDER');
-  const redDragons = taken.filter((d) => d.team === 'CHAOS');
+  const name1 = (cfg.team1 || 'Azul').trim().toUpperCase();
+  const name2 = (cfg.team2 || 'Rojo').trim().toUpperCase();
+  const fit = (name: string) => (name.length <= 13 ? 30 : Math.max(19, Math.round((30 * 13) / name.length)));
+
+  // Team / Kills se llaman como funciones: como <Componente /> se remontarían en cada tick.
+  const Team = (side: 'blue' | 'red') => {
+    const isBlue = side === 'blue';
+    const name = isBlue ? name1 : name2;
+    const teamLogo = isBlue ? cfg.logo1 : cfg.logo2;
+    const fill = isBlue ? T.blueFill : T.redFill;
+    return (
+      <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '0 20px 4px', flexDirection: isBlue ? 'row' : 'row-reverse' }}>
+        <span style={{ ...disp(26), width: 44, height: 44, flex: 'none', display: 'grid', placeItems: 'center', borderRadius: 6, overflow: 'hidden', background: teamLogo ? 'transparent' : fill, color: '#fff' }}>
+          {teamLogo
+            ? <img src={teamLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
+            : name.slice(0, 1)}
+        </span>
+        <div style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: 4, alignItems: isBlue ? 'flex-start' : 'flex-end' }}>
+          <span style={{ ...disp(fit(name)), maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#fff', paddingRight: 3 }}>{name}</span>
+          <span style={{ fontFamily: T.data, fontSize: 12, fontWeight: 700, letterSpacing: '0.14em', lineHeight: 1, color: isBlue ? T.blue : T.red }}>{isBlue ? 'LADO AZUL' : 'LADO ROJO'}</span>
+        </div>
+        <div style={{ flex: 'none', display: 'flex', alignItems: 'baseline', gap: 6, flexDirection: isBlue ? 'row' : 'row-reverse' }}>
+          <span style={{ fontFamily: T.data, fontSize: 12.5, fontWeight: 700, letterSpacing: '0.1em', color: T.muted }}>VISIÓN</span>
+          <span style={{ fontFamily: T.data, fontWeight: 700, fontSize: T.id === 'lqc' ? 18 : 20, color: '#fff' }}>{sum(isBlue ? blue : red, 'wardScore')}</span>
+        </div>
+        <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 4, background: fill }} />
+      </div>
+    );
+  };
+
+  const Kills = (side: 'blue' | 'red') => (
+    <div style={{ ...disp(50), textShadow: T.glow ? '0 0 18px rgba(255,255,255,.45)' : undefined, width: 88, flex: 'none', display: 'grid', placeItems: 'center', background: side === 'blue' ? T.blueFill : T.redFill, color: '#fff' }}>
+      <Blip value={sum(side === 'blue' ? blue : red, 'kills')} />
+    </div>
+  );
 
   return (
-    <>
-      {/* Barra principal */}
-      <div
+    <div style={{ position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)', width: 1320, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {/* Marcador: baja desde arriba al abrir */}
+      <motion.div
+        initial={{ opacity: 0, y: -72 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: EASE }}
         style={{
-          position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)',
-          width: 1160, height: 64,
-          background: 'var(--panel-bg)',
-          border: '1px solid rgba(200,205,214,.24)', borderTop: 'none',
-          clipPath: 'polygon(0 0,100% 0,calc(100% - 22px) 100%,22px 100%)',
-          display: 'flex', alignItems: 'stretch',
+          width: '100%', height: 68, display: 'flex', alignItems: 'stretch', overflow: 'hidden',
+          background: T.panelImg || T.panel, border: `1px solid ${T.line}`, borderTop: 'none', borderRadius: '0 0 10px 10px',
+          boxShadow: '0 16px 34px -16px rgba(0,0,0,.85)',
         }}
       >
-        {/* Equipo azul */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12, paddingLeft: 38, minWidth: 0 }}>
-          <HexBadge txt="AZ" />
-          <div style={{ minWidth: 0 }}>
-            <div className="display" style={{ fontWeight: 700, fontSize: 17, letterSpacing: '0.12em', color: 'var(--text)' }}>AZUL</div>
-            <div style={{ fontSize: 10, letterSpacing: '0.12em', color: 'var(--text-dim)' }}>LADO AZUL · LQC</div>
-          </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, paddingRight: 14 }}>
-            <span style={{ font: '600 13px var(--font-data)', color: 'var(--text-dim)' }}>VIS</span>
-            <span style={{ font: '600 15px var(--font-data)', color: 'var(--text-soft)' }}>
-              {blue.reduce((a, p) => a + (p.wardScore || 0), 0)}
-            </span>
-          </div>
+        {Team('blue')}
+        {Kills('blue')}
+        <div style={{ width: 150, flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, background: T.strip }}>
+          {T.id === 'lqc'
+            ? <img src={lqcMark} alt="LQC" style={{ height: 21 }} />
+            : <img src={logo} alt="ATAK.GG" style={{ height: 30 }} />}
+          <span style={{ ...disp(23), color: '#fff' }}>{fmtClock(s.gameTime)}</span>
         </div>
+        {Kills('red')}
+        {Team('red')}
+      </motion.div>
 
-        {/* Marcador central */}
-        <div
-          style={{
-            width: 250, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14,
-            background: 'linear-gradient(180deg,rgba(225,36,46,.14),rgba(225,36,46,.04))',
-            borderLeft: '1px solid rgba(200,205,214,.2)', borderRight: '1px solid rgba(200,205,214,.2)',
-            position: 'relative',
-          }}
-        >
-          <span className="display" style={{ fontWeight: 800, fontSize: 34, color: 'var(--text)' }}>{kills(blue)}</span>
-          <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-            <img src={logo} alt="ATAK.GG" style={{ height: 26, filter: 'drop-shadow(0 0 5px rgba(225,36,46,.5))' }} />
-            <span className="mono" style={{ fontWeight: 700, fontSize: 11, color: 'var(--text-soft)' }}>{fmtClock(s.gameTime)}</span>
-          </span>
-          <span className="display" style={{ fontWeight: 800, fontSize: 34, color: 'var(--crimson)' }}>{kills(red)}</span>
-          <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg,#9ba0ab,#E1242E)' }} />
-        </div>
-
-        {/* Equipo rojo */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12, paddingRight: 38, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 14 }}>
-            <span style={{ font: '600 15px var(--font-data)', color: 'var(--crimson-soft)' }}>
-              {red.reduce((a, p) => a + (p.wardScore || 0), 0)}
-            </span>
-            <span style={{ font: '600 13px var(--font-data)', color: 'var(--text-dim)' }}>VIS</span>
-          </div>
-          <div style={{ marginLeft: 'auto', textAlign: 'right', minWidth: 0 }}>
-            <div className="display" style={{ fontWeight: 700, fontSize: 17, letterSpacing: '0.12em', color: 'var(--crimson-soft)' }}>ROJO</div>
-            <div style={{ fontSize: 10, letterSpacing: '0.12em', color: 'var(--text-dim)' }}>LQC · LADO ROJO</div>
-          </div>
-          <HexBadge txt="RJ" red />
-        </div>
-      </div>
-
-      {/* Chips de objetivos + medallones de dragones */}
-      <div style={{ position: 'fixed', top: 68, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <TimerChip label="DRAGÓN" icon="dragon" nextAt={o.dragon.nextAt} alive={o.dragon.alive} gameTime={s.gameTime} />
-        <TimerChip label="BARÓN" icon="baron" nextAt={o.baron.nextAt} alive={o.baron.alive} gameTime={s.gameTime} />
-        <span style={{ width: 1, height: 18, background: 'linear-gradient(180deg,transparent,#6f7480,transparent)' }} />
-        <DragonMedals tag="AZ" taken={blueDragons} />
-        <DragonMedals tag="RJ" taken={redDragons} />
-      </div>
-    </>
+      {/* Dragones tomados + timers de objetivos */}
+      <motion.div
+        initial={{ opacity: 0, y: -14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE, delay: 0.35 }}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}
+      >
+        <DragonMedals T={T} color={T.blue} taken={taken.filter((d) => d.team === 'ORDER')} />
+        <TimerChip T={{ ...T, accent }} label="DRAGÓN" icon="dragon" nextAt={o.dragon.nextAt} alive={o.dragon.alive} gameTime={s.gameTime} />
+        <TimerChip T={{ ...T, accent }} label="BARÓN" icon="baron" nextAt={o.baron.nextAt} alive={o.baron.alive} gameTime={s.gameTime} />
+        <DragonMedals T={T} color={T.red} taken={taken.filter((d) => d.team === 'CHAOS')} right />
+      </motion.div>
+    </div>
   );
 }

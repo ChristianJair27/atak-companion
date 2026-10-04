@@ -57,10 +57,10 @@ interface Props {
 const Chip = ({ ok, children }: { ok: boolean; children: any }) => (
   <span style={{
     display: 'inline-flex', alignItems: 'center', gap: 4,
-    fontSize: 9.5, fontWeight: 700, letterSpacing: '0.06em',
-    color: ok ? '#8fd99e' : 'var(--crimson-soft)',
-    border: `1px solid ${ok ? 'rgba(143,217,158,.4)' : 'rgba(225,36,46,.4)'}`,
-    background: ok ? 'rgba(143,217,158,.08)' : 'rgba(225,36,46,.08)',
+    fontSize: 11.5, fontWeight: 700, letterSpacing: '0.05em', borderRadius: 4,
+    color: ok ? 'var(--ax-green)' : 'var(--ax-neg)',
+    border: `1px solid ${ok ? 'rgba(61,220,151,.38)' : 'rgba(255,107,118,.38)'}`,
+    background: ok ? 'rgba(61,220,151,.12)' : 'rgba(255,107,118,.12)',
     padding: '1px 6px',
   }}>
     {ok ? '✓' : '✕'} {children}
@@ -130,7 +130,7 @@ export default function EogRuneAnalysis({
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <span className="label">TU DUELO</span>
           <ChampIcon patch={patch} name={myChampion} size={30} />
-          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>vs</span>
+          <span style={{ fontSize: 12.5, color: 'var(--text-dim)' }}>vs</span>
           {enemyChampions.map((c) => (
             <button
               key={c}
@@ -139,7 +139,7 @@ export default function EogRuneAnalysis({
               title={`Comparar contra ${c}`}
               style={{
                 padding: 0, background: 'transparent', cursor: 'pointer',
-                border: c === rival ? '1px solid rgba(200,170,110,.9)' : '1px solid transparent',
+                border: c === rival ? '2px solid #fff' : '2px solid transparent',
                 opacity: c === rival ? 1 : 0.5,
               }}
             >
@@ -147,13 +147,13 @@ export default function EogRuneAnalysis({
             </button>
           ))}
           {!enemyChampions.length && (
-            <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>Sin equipo enemigo en los datos</span>
+            <span style={{ fontSize: 12.5, color: 'var(--text-dim)' }}>Sin equipo enemigo en los datos</span>
           )}
         </div>
         {data && (
-          <div style={{ marginTop: 8, fontSize: 10.5, color: 'var(--text-dim)' }}>
+          <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-soft)' }}>
             {data.winRate != null
-              ? <>Winrate global de <strong style={{ color: '#fff' }}>{myChampion}</strong> vs {rival}: <strong style={{ color: data.winRate >= 50 ? '#8fd99e' : 'var(--crimson-soft)' }}>{data.winRate}%</strong> en {data.play} partidas (OP.GG)</>
+              ? <>Winrate global de <strong style={{ color: '#fff' }}>{myChampion}</strong> vs {rival}: <strong style={{ color: data.winRate >= 50 ? 'var(--ax-green)' : 'var(--ax-neg)' }}>{data.winRate}%</strong> en {data.play} partidas (OP.GG)</>
               : <>Sin muestra de este duelo en OP.GG</>}
           </div>
         )}
@@ -171,22 +171,22 @@ export default function EogRuneAnalysis({
         <div className="panel" style={{ padding: '12px 14px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
             <div className="label">RUNAS · LO QUE LLEVASTE VS EL DUELO</div>
-            <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
               {rec.play} partidas del duelo{rec.winRate != null ? ` · ${rec.winRate}% WR` : ''}
             </span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6, letterSpacing: '0.1em' }}>LLEVASTE</div>
+              <div className="label" style={{ marginBottom: 6 }}>LLEVASTE</div>
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
                 {usedRunes.perkIds.length ? usedRunes.perkIds.slice(0, 6).map((id, i) => (
                   <RuneIcon key={i} id={id} patch={patch} size={i === 0 ? 38 : 24} keystone={i === 0} hot={i === 0} />
-                )) : <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>El cliente no mandó tus runas</span>}
+                )) : <span style={{ fontSize: 12.5, color: 'var(--text-dim)' }}>El cliente no mandó tus runas</span>}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 10, color: '#c8aa6e', marginBottom: 6, letterSpacing: '0.1em' }}>
+              <div className="label" style={{ marginBottom: 6, color: 'var(--text)' }}>
                 RECOMENDADO VS {String(rival).toUpperCase()}
               </div>
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -209,7 +209,7 @@ export default function EogRuneAnalysis({
           </div>
 
           {diff.missing.length > 0 && (
-            <div className="tip" style={{ marginTop: 8, fontSize: 10.5 }}>
+            <div className="tip" style={{ marginTop: 8 }}>
               Te faltaron: <strong>{diff.missing.map((id) => diff.recNames[diff.recIds.indexOf(id)] || id).join(' · ')}</strong>
             </div>
           )}
@@ -222,7 +222,7 @@ export default function EogRuneAnalysis({
           <div className="label" style={{ marginBottom: 10 }}>ITEMS CORE DEL DUELO</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6, letterSpacing: '0.1em' }}>LLEVASTE</div>
+              <div className="label" style={{ marginBottom: 6 }}>LLEVASTE</div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {myItems.filter(Boolean).map((id, i) => (
                   <ItemIcon key={i} patch={patch} id={id} size={30} />
@@ -230,21 +230,21 @@ export default function EogRuneAnalysis({
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 10, color: '#c8aa6e', marginBottom: 6, letterSpacing: '0.1em' }}>RECOMENDADO</div>
+              <div className="label" style={{ marginBottom: 6, color: 'var(--text)' }}>RECOMENDADO</div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
                 {recCore.map((id, i) => (
                   <span key={i} style={{ position: 'relative', display: 'inline-block' }}>
                     <ItemIcon patch={patch} id={id} size={30} />
                     {!usedSet.has(id) && (
                       <span style={{
-                        position: 'absolute', inset: 0, border: '1px solid rgba(225,36,46,.75)',
-                        boxShadow: 'inset 0 0 8px rgba(225,36,46,.35)', pointerEvents: 'none',
+                        position: 'absolute', inset: 0, border: '2px solid var(--crimson)', borderRadius: 4,
+                        pointerEvents: 'none',
                       }} />
                     )}
                   </span>
                 ))}
               </div>
-              <div style={{ fontSize: 9.5, color: 'var(--text-faint)', marginTop: 5 }}>
+              <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 5 }}>
                 {recCoreNames.join(' → ')}
               </div>
             </div>
@@ -255,10 +255,10 @@ export default function EogRuneAnalysis({
       {/* Tip del duelo */}
       {data?.tip && (
         <div className="panel" style={{ padding: '10px 12px' }}>
-          <div className="label" style={{ marginBottom: 6, color: '#c8aa6e' }}>
+          <div className="label" style={{ marginBottom: 6, color: 'var(--text)' }}>
             CÓMO SE JUEGA VS {String(rival).toUpperCase()} (OP.GG, EN)
           </div>
-          <div className="tip" style={{ fontSize: 10.5, lineHeight: 1.45 }}>{data.tip}</div>
+          <div className="tip hot">{data.tip}</div>
         </div>
       )}
     </div>

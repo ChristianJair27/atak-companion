@@ -1,60 +1,78 @@
-/* src/styles.css — Sistema visual ATAK.GG (extraído de design/ATAK-Screens.html)
-   Paleta: crimson #E1242E · plata/cromo · negro #0A0A0C.
-   Tipografías: Friz Quadrata (LoL display) · Saira Condensed (datos) · JetBrains Mono. */
-
-@font-face {
-  font-family: 'Friz Quadrata';
-  src: url('/fonts/friz-quadrata-std-medium.otf') format('opentype');
-  font-weight: 400 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Friz Quadrata';
-  src: url('/fonts/friz-quadrata-regular.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Friz Quadrata';
-  src: url('/fonts/friz-quadrata-bold.otf') format('opentype');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Friz Quadrata';
-  src: url('/fonts/friz-quadrata-italic.ttf') format('truetype');
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
+/* src/styles.css — Sistema visual ATAK.GG "Arena" (el mismo del sitio:
+   aka.gg/design-system/atak-gg/MASTER.md).
+   · una sola superfamilia: Barlow Condensed (títulos, cifras) · Barlow Semi
+     Condensed (datos, etiquetas) · Barlow (texto corrido)
+   · un acento (crimson) + oro para honores + verde/rojo solo para V/D
+   · superficies opacas con hairline, radios 10 / 6 / 4, sin blur por panel
+   · movimiento solo en transform / opacity, apagado con reduced-motion
+   Los tokens --ax-* son la fuente; los nombres viejos (--crimson, --text-dim…)
+   y los del kit (--hx-*, hextech.css) apuntan a ellos. */
 
 :root {
-  --crimson: #E1242E;
-  --crimson-deep: #7d1017;
-  --crimson-soft: #ff9aa0;
-  --ink: #0A0A0C;
-  --ink-2: #101115;
-  --text: #e9ebef;
-  --text-soft: #c9cdd6;
-  --text-dim: #8b8f9a;
-  --text-faint: #5c616c;
-  --metal: #9ba0ab;
-  --metal-dark: #6f7480;
-  --line: #2a2c33;
-  --green: #4dbb63;
-  --panel-bg: rgba(10, 10, 12, 0.88);
-  --panel-bg-strong: rgba(10, 10, 14, 0.94);
-  --border-metal: rgba(200, 205, 214, 0.22);
-  --border-metal-soft: rgba(200, 205, 214, 0.14);
-  --border-crimson: rgba(225, 36, 46, 0.4);
-  --border-crimson-hot: rgba(225, 36, 46, 0.6);
-  /* Friz Quadrata = fuente display oficial de League of Legends (como aka.gg) */
-  --font-display: 'Friz Quadrata', 'Cinzel', Georgia, serif;
-  --font-data: 'Saira Condensed', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  /* Superficies */
+  --ax-bg: #0a0a0c;
+  --ax-strip: #0e0e11;
+  --ax-card: #121216;
+  --ax-sub: #18181d;
+  --ax-sunken: #1f1f26;
+  --ax-sunken-2: #272730;
+  /* Hairlines */
+  --ax-line: rgba(255, 255, 255, 0.09);
+  --ax-line-soft: rgba(255, 255, 255, 0.06);
+  --ax-line-hov: rgba(255, 255, 255, 0.2);
+  --ax-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 16px 36px -22px rgba(0, 0, 0, 0.9);
+  /* Marca */
+  --ax-red: #e8323c;
+  --ax-red-hi: #ff4b57;
+  --ax-red-deep: #8d1a22;
+  --ax-red-wash: rgba(232, 50, 60, 0.12);
+  --ax-red-glow: rgba(232, 50, 60, 0.38);
+  --ax-gold: #c8aa6e;
+  --ax-gold-hi: #f0d891;
+  /* Estados */
+  --ax-green: #3ddc97;
+  --ax-neg: #ff6b76;
+  --ax-amber: #f5a524;
+  --ax-blue: #6db3ff;
+  /* Texto */
+  --ax-text: #f5f5f6;
+  --ax-text-2: #b6b6c0;
+  --ax-muted: #8c8c98;
+  --ax-faint: #74747f;
+  /* Tipografía */
+  --ax-display: 'Barlow Condensed', 'Barlow Semi Condensed', 'Arial Narrow', sans-serif;
+  --ax-data: 'Barlow Semi Condensed', 'Barlow', 'Arial Narrow', sans-serif;
+  --ax-ui: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+  /* Forma y movimiento */
+  --ax-r-panel: 10px;
+  --ax-r-ctl: 6px;
+  --ax-r-chip: 4px;
+  --ax-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ax-dur: 180ms;
+
+  /* Nombres heredados → Arena */
+  --crimson: var(--ax-red);
+  --crimson-deep: var(--ax-red-deep);
+  --crimson-soft: var(--ax-neg);
+  --ink: var(--ax-bg);
+  --ink-2: var(--ax-strip);
+  --text: var(--ax-text);
+  --text-soft: var(--ax-text-2);
+  --text-dim: var(--ax-muted);
+  --text-faint: var(--ax-faint);
+  --metal: #d7d9de;
+  --metal-dark: #5c5c68;
+  --line: #2a2a33;
+  --green: var(--ax-green);
+  --panel-bg: rgba(18, 18, 22, 0.96);
+  --panel-bg-strong: #121216;
+  --border-metal: var(--ax-line);
+  --border-metal-soft: var(--ax-line-soft);
+  --border-crimson: rgba(232, 50, 60, 0.45);
+  --border-crimson-hot: rgba(232, 50, 60, 0.7);
+  --font-display: var(--ax-display);
+  --font-data: var(--ax-data);
+  --font-mono: var(--ax-data);
 }
 
 * { box-sizing: border-box; }
@@ -63,167 +81,142 @@ body {
   font-family: var(--font-data);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums lining-nums;
   overflow: hidden;
   user-select: none;
 }
 
 @keyframes atakPulse {
-  0%, 100% { box-shadow: 0 0 5px rgba(225, 36, 46, 0.4); }
-  50% { box-shadow: 0 0 14px rgba(225, 36, 46, 0.85); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }
 @keyframes atakDot {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
 }
 
-/* ── Recortes angulares (esquinas cortadas TR + BL, marca de la casa) ─────── */
-.cut {
-  --cut: 14px;
-  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
-}
-.cut-sm { --cut: 12px; }
-.cut-lg { --cut: 16px; }
-/* Paralelogramo (chips / botones / badges) */
-.skew {
-  --skew: 8px;
-  clip-path: polygon(var(--skew) 0, 100% 0, calc(100% - var(--skew)) 100%, 0 100%);
-}
+/* ── Formas heredadas: en Arena las cajas son rectas con radio ────────────── */
+.cut { border-radius: var(--ax-r-panel); }
+.cut-sm { border-radius: 8px; }
+.cut-lg { border-radius: var(--ax-r-panel); }
+.skew { border-radius: var(--ax-r-ctl); }
 
 /* ── Paneles ──────────────────────────────────────────────────────────────── */
 .panel {
   background: var(--panel-bg);
-  border: 1px solid var(--border-metal);
+  border: 1px solid var(--ax-line);
+  border-radius: var(--ax-r-panel);
+  box-shadow: var(--ax-shadow);
 }
 .panel-crimson { border-color: var(--border-crimson); }
 
-/* ── Texto metálico / display ─────────────────────────────────────────────── */
-.metal-text {
+/* ── Texto display ────────────────────────────────────────────────────────── */
+.metal-text, .metal-text-bright {
   font-family: var(--font-display);
-  background: linear-gradient(180deg, #f5f6f8, #b9bdc6 55%, #7d828e);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.metal-text-bright {
-  font-family: var(--font-display);
-  background: linear-gradient(180deg, #fff, #b9bdc6 60%, #7d828e);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  font-style: italic;
+  color: #fff;
 }
 .display { font-family: var(--font-display); }
-.mono { font-family: var(--font-mono); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums lining-nums; }
 
-/* Etiquetas pequeñas espaciadas */
+/* Etiquetas en mayúsculas */
 .label {
-  font-size: 9px;
-  letter-spacing: 0.18em;
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   color: var(--text-dim);
   text-transform: uppercase;
 }
 .label-faint { color: var(--text-faint); }
 
-/* Líneas decorativas */
+/* Líneas */
 .hr {
   height: 1px;
   border: none;
   margin: 0;
-  background: linear-gradient(90deg, transparent, #d7dae1 30%, #d7dae1 70%, transparent);
+  background: var(--ax-line);
 }
-.hr-soft { background: linear-gradient(90deg, transparent, var(--metal-dark) 30%, var(--metal-dark) 70%, transparent); }
+.hr-soft { background: var(--ax-line-soft); }
 .hr-red { background: linear-gradient(90deg, var(--crimson), transparent 70%); }
 
 /* Punto "en vivo" */
 .dot {
-  width: 6px; height: 6px;
+  width: 7px; height: 7px;
   border-radius: 50%;
   background: var(--crimson);
   animation: atakDot 1.6s infinite;
   display: inline-block;
   flex: none;
 }
-.dot-ok { background: var(--green); box-shadow: 0 0 8px rgba(77, 187, 99, 0.6); animation: none; }
-.dot-lg { width: 9px; height: 9px; box-shadow: 0 0 8px rgba(225, 36, 46, 0.7); }
+.dot-ok { background: var(--green); animation: none; }
+.dot-lg { width: 9px; height: 9px; }
 .dot-off { background: var(--text-faint); animation: none; }
 
-/* ── Chips de estadística (fila de 5 del HUD) ─────────────────────────────── */
+/* ── Chips de estadística ─────────────────────────────────────────────────── */
 .stat-chip {
-  background: rgba(255, 255, 255, 0.05);
-  border-top: 1px solid rgba(200, 205, 214, 0.28);
-  padding: 4px 2px;
+  background: var(--ax-sub);
+  border: 1px solid var(--ax-line-soft);
+  border-radius: var(--ax-r-ctl);
+  padding: 5px 4px;
   text-align: center;
 }
-.stat-chip .v { font: 600 13px var(--font-data); }
-.stat-chip .k { font-size: 8.5px; letter-spacing: 0.1em; color: var(--text-dim); }
+.stat-chip .v { font: 700 15px var(--font-display); }
+.stat-chip .k { font-size: 11px; letter-spacing: 0.08em; color: var(--text-dim); }
 
-/* Mini celda combate (AD/AP/ARM/RM) */
 .kv {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 3px 6px;
-  background: rgba(255, 255, 255, 0.04);
+  padding: 3px 7px;
+  background: var(--ax-sub);
+  border-radius: var(--ax-r-chip);
 }
-.kv .k { font-size: 9.5px; color: var(--text-dim); letter-spacing: 0.06em; }
-.kv .v { font: 600 11px var(--font-data); }
+.kv .k { font-size: 11px; color: var(--text-dim); letter-spacing: 0.06em; }
+.kv .v { font: 600 12px var(--font-data); }
 
-/* ── Chip de objetivo (dragón/heraldo/barón) ──────────────────────────────── */
+/* ── Chip de objetivo (dragón / heraldo / barón) ──────────────────────────── */
 .obj-chip {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 5px 8px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-metal);
+  background: var(--ax-sub);
+  border: 1px solid var(--ax-line);
+  border-radius: var(--ax-r-chip);
 }
-.obj-chip .k { font-size: 8.5px; letter-spacing: 0.12em; color: var(--text-dim); }
-.obj-chip .v { font: 700 12px var(--font-mono); color: var(--text-soft); }
-.obj-chip.live {
-  background: rgba(225, 36, 46, 0.12);
-  border-color: var(--border-crimson-hot);
-  animation: atakPulse 2s infinite;
-}
-.obj-chip.live .k { color: var(--crimson-soft); }
-.obj-chip.live .v { color: #fff; }
+.obj-chip .k { font-size: 11px; letter-spacing: 0.1em; color: var(--text-dim); }
+.obj-chip .v { font: 700 12.5px var(--font-mono); color: var(--text-soft); }
+.obj-chip.live { background: var(--crimson); border-color: var(--crimson); }
+.obj-chip.live .k, .obj-chip.live .v { color: #fff; }
 .obj-chip.off .v { color: var(--text-faint); }
 
-/* ── Barras (vida / recurso / daño) ───────────────────────────────────────── */
-.bar { background: #1a1b20; position: relative; overflow: hidden; }
+/* ── Barras ───────────────────────────────────────────────────────────────── */
+.bar { background: var(--ax-sunken-2); border-radius: 2px; position: relative; overflow: hidden; }
 .bar > i {
   position: absolute;
   inset: 0;
   right: auto;
   display: block;
-  background: linear-gradient(90deg, var(--crimson-deep), var(--crimson));
-  transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  background: var(--crimson);
+  transition: width 0.3s var(--ax-ease);
 }
-.bar.silver > i { background: linear-gradient(90deg, #4a4e58, var(--metal)); }
+.bar.silver > i { background: var(--metal); }
 .bar .bar-txt {
   position: absolute;
   right: 3px; top: -1px;
-  font: 600 8.5px var(--font-data);
+  font: 600 10px var(--font-data);
   color: var(--text);
 }
-.dmg-bar {
-  height: 8px;
-  background: linear-gradient(90deg, var(--crimson-deep), var(--crimson));
-  box-shadow: 0 0 6px rgba(225, 36, 46, 0.35);
-}
+.dmg-bar { height: 8px; border-radius: 2px; background: var(--crimson); }
 
-/* Riel de daño: el % se mide sobre el rail, no sobre un flex suelto (EOG fix). */
-.dmg-track {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  width: 100%;
-}
+.dmg-track { display: flex; align-items: center; gap: 6px; min-width: 0; width: 100%; }
 .dmg-track-rail {
   flex: 1 1 auto;
   min-width: 0;
-  height: 8px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.06);
+  height: 6px;
+  border-radius: 2px;
+  background: var(--ax-sunken-2);
   overflow: hidden;
   position: relative;
 }
@@ -231,153 +224,113 @@ body {
   display: block;
   height: 100%;
   max-width: 100%;
-  border-radius: 3px;
-  background: linear-gradient(90deg, var(--crimson-deep), var(--crimson));
-  box-shadow: 0 0 8px rgba(225, 36, 46, 0.4);
+  border-radius: 2px;
+  background: var(--crimson);
   transition: width 0.25s ease;
 }
 .dmg-track-val {
   flex: none;
-  width: 38px;
+  width: 40px;
   text-align: right;
-  font: 600 10px var(--font-data);
+  font: 600 11.5px var(--font-data);
   color: var(--text-soft);
-  font-variant-numeric: tabular-nums;
 }
 
-/* Chips de composición (AD/AP/Tank…) */
+/* Chips de composición */
 .comp-chip {
+  --c: var(--ax-text-2);
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 8px;
-  font-size: 10px;
+  min-height: 22px;
+  padding: 0 8px;
+  font-size: 11.5px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  border: 1px solid rgba(200, 205, 214, 0.16);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-soft);
-  border-radius: 4px;
+  color: var(--c);
+  border: 1px solid color-mix(in srgb, var(--c) 36%, transparent);
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+  border-radius: var(--ax-r-chip);
 }
-.comp-chip.ok {
-  border-color: rgba(77, 187, 99, 0.45);
-  background: rgba(77, 187, 99, 0.1);
-  color: #8fd99e;
-}
-.comp-chip.miss {
-  border-color: rgba(225, 36, 46, 0.45);
-  background: rgba(225, 36, 46, 0.1);
-  color: var(--crimson-soft);
-}
-.comp-chip .n {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-}
+.comp-chip.ok { --c: var(--ax-green); }
+.comp-chip.miss { --c: var(--ax-neg); }
+.comp-chip .n { font-family: var(--font-mono); font-size: 12px; font-weight: 700; }
 
-/* Stat chip con icono */
-.stat-chip.iconic {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-width: 56px;
-}
-.stat-chip.iconic .ico {
-  opacity: 0.85;
-  display: grid;
-  place-items: center;
-}
+.stat-chip.iconic { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 56px; }
+.stat-chip.iconic .ico { opacity: 0.85; display: grid; place-items: center; }
 
 /* ── Badges ───────────────────────────────────────────────────────────────── */
 .badge {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  padding: 3px 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  border-radius: var(--ax-r-chip);
   display: inline-block;
 }
-.badge-red { color: #fff; background: linear-gradient(100deg, var(--crimson-deep), var(--crimson)); }
-.badge-silver { color: var(--ink); background: linear-gradient(180deg, #f5f6f8, var(--metal)); }
-.badge-outline { color: var(--text-soft); border: 1px solid rgba(200, 205, 214, 0.35); }
-.badge-outline-red { color: var(--crimson); border: 1px solid rgba(225, 36, 46, 0.5); }
+.badge-red { color: #fff; background: var(--crimson); }
+.badge-silver { color: var(--ink); background: var(--ax-text); }
+.badge-outline { color: var(--text-soft); border: 1px solid var(--ax-line-hov); }
+.badge-outline-red { color: var(--ax-red-hi); border: 1px solid var(--border-crimson); }
 .badge-glow { animation: atakPulse 2s infinite; }
 
 /* ── Botones ──────────────────────────────────────────────────────────────── */
-/* Base con superficie visible: antes era background:none + sin borde ni color
-   → texto oscuro invisible sobre fondo oscuro. Ahora todo .btn es un botón de
-   verdad: placa con hairline, texto claro, hover con lift + glow y barrido de
-   brillo (estilo React Bits shiny-button, hecho en CSS puro). */
 .btn {
   font-family: var(--font-data);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  padding: 8px 18px;
-  color: var(--text-soft, #c8ccd4);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
-  border: 1px solid rgba(200, 205, 214, 0.28);
-  border-radius: 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  min-height: 36px;
+  padding: 0 16px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--ax-line-hov);
+  border-radius: var(--ax-r-ctl);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   text-transform: uppercase;
-  position: relative;
-  overflow: hidden;
-  transition: color 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s, background 0.15s;
+  white-space: nowrap;
+  transition: color var(--ax-dur) var(--ax-ease), border-color var(--ax-dur) var(--ax-ease),
+    background var(--ax-dur) var(--ax-ease), transform var(--ax-dur) var(--ax-ease);
 }
-.btn::after {
-  /* barrido de brillo al hover */
-  content: '';
-  position: absolute;
-  top: 0; bottom: 0; width: 42%;
-  left: -60%;
-  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.14), transparent);
-  transition: left 0.45s ease;
-  pointer-events: none;
-}
-.btn:hover:not(:disabled) {
-  color: #fff;
-  border-color: rgba(225, 36, 46, 0.65);
-  box-shadow: 0 0 14px rgba(225, 36, 46, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  transform: translateY(-1px);
-}
-.btn:hover:not(:disabled)::after { left: 120%; }
-.btn:active:not(:disabled) { transform: translateY(0); }
+.btn:hover:not(:disabled) { border-color: var(--crimson); background: var(--ax-red-wash); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid var(--ax-red-hi); outline-offset: 2px; }
+/* Primario: bloque crimson con la esquina inferior derecha cortada */
 .btn-primary {
   color: #fff;
-  background: linear-gradient(100deg, var(--crimson-deep), var(--crimson));
-  border-color: rgba(225, 36, 46, 0.7);
-  box-shadow: 0 0 12px rgba(225, 36, 46, 0.4);
+  background: var(--crimson);
+  border-color: transparent;
+  border-radius: var(--ax-r-ctl) var(--ax-r-ctl) 0 var(--ax-r-ctl);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%);
 }
-.btn-primary:hover:not(:disabled) {
-  filter: brightness(1.12);
-  border-color: var(--crimson);
-  box-shadow: 0 0 18px rgba(225, 36, 46, 0.55);
-}
-.btn-ghost { color: var(--text-soft); border: 1px solid rgba(200, 205, 214, 0.4); }
-.btn-ghost:hover { color: #fff; border-color: #fff; }
-.btn-big { font-size: 14px; font-weight: 700; letter-spacing: 0.14em; padding: 12px 30px; box-shadow: 0 0 16px rgba(225, 36, 46, 0.45); }
-.btn:disabled { filter: saturate(0.3) brightness(0.7); cursor: default; }
+.btn-primary:hover:not(:disabled) { background: var(--ax-red-hi); border-color: transparent; }
+.btn-ghost { color: var(--text-soft); background: transparent; border-color: var(--ax-line); }
+.btn-ghost:hover:not(:disabled) { color: #fff; border-color: var(--ax-line-hov); background: transparent; }
+.btn-big { font-size: 14px; min-height: 44px; padding: 0 26px; }
+.btn:disabled { color: var(--text-faint); background: var(--ax-sunken); border-color: var(--ax-line); cursor: default; }
 
 /* ── Inputs ───────────────────────────────────────────────────────────────── */
-.field .label { display: block; font-size: 9.5px; letter-spacing: 0.16em; margin-bottom: 4px; }
+.field .label { display: block; margin-bottom: 5px; }
 .input {
   width: 100%;
-  background: var(--ink-2);
-  border: 1px solid rgba(200, 205, 214, 0.2);
+  min-height: 36px;
+  background: var(--ax-strip);
+  border: 1px solid var(--ax-line);
+  border-radius: var(--ax-r-ctl);
   padding: 7px 10px;
   font-family: var(--font-data);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
   outline: none;
   user-select: text;
 }
-.input:focus { border-color: var(--border-crimson-hot); }
-.input.mono { font: 12.5px var(--font-mono); }
+.input:focus { border-color: var(--crimson); }
+.input.mono { font: 13.5px var(--font-mono); }
 .input::placeholder { color: var(--text-faint); }
 
 /* ── Retrato de campeón ───────────────────────────────────────────────────── */
@@ -386,15 +339,16 @@ body {
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: linear-gradient(135deg, #2a2c33, #141519);
-  box-shadow: 0 0 0 1px var(--metal-dark);
+  border-radius: var(--ax-r-chip);
+  background: var(--ax-sunken);
+  box-shadow: 0 0 0 1px var(--ax-line-hov);
   font-family: var(--font-display);
   font-weight: 700;
   color: var(--text);
 }
-.champ.enemy { background: linear-gradient(135deg, #331114, #141519); box-shadow: 0 0 0 1px var(--crimson-deep); }
+.champ.enemy { box-shadow: 0 0 0 1px var(--crimson); }
 .champ.round { border-radius: 50%; }
-.champ img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.champ img { display: block; width: 100%; height: 100%; object-fit: cover; transform: scale(1.1); }
 
 /* Ítem (icono DDragon) */
 .item {
@@ -402,15 +356,17 @@ body {
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: linear-gradient(135deg, #23252b, #101115);
-  box-shadow: 0 0 0 1px var(--metal-dark);
-  font: 700 9px var(--font-display);
+  border-radius: var(--ax-r-chip);
+  background: var(--ax-sunken);
+  outline: 1px solid var(--ax-line);
+  outline-offset: -1px;
+  font: 700 10px var(--font-display);
   color: var(--text-soft);
 }
-.item.core { background: linear-gradient(135deg, #3a1216, #101115); box-shadow: 0 0 0 1px var(--crimson); color: #fff; }
+.item.core { outline-color: var(--crimson); color: #fff; }
 .item img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
-/* ── Barra de título (ventana principal) ──────────────────────────────────── */
+/* ── Barra de título ──────────────────────────────────────────────────────── */
 .drag { -webkit-app-region: drag; }
 .no-drag { -webkit-app-region: no-drag; }
 .tb-btn {
@@ -427,48 +383,50 @@ body {
 .tb-btn:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
 .tb-btn.close:hover { background: var(--crimson); color: #fff; }
 
-/* Riel de navegación */
 .rail-btn {
   width: 44px; height: 44px;
   display: grid;
   place-items: center;
-  color: var(--metal-dark);
+  color: var(--text-dim);
   cursor: pointer;
   position: relative;
   border: none;
+  border-radius: var(--ax-r-ctl);
   background: none;
 }
 .rail-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); }
-.rail-btn.active { background: rgba(225, 36, 46, 0.14); border-left: 2px solid var(--crimson); color: #fff; }
+.rail-btn.active { background: var(--ax-red-wash); box-shadow: inset 2px 0 0 var(--crimson); color: #fff; }
 
-/* ── Fila de habilidad (orden de skills) ──────────────────────────────────── */
+/* ── Fila de habilidad ────────────────────────────────────────────────────── */
 .sk {
-  height: 16px;
+  height: 18px;
   display: grid;
   place-items: center;
-  font: 600 9px var(--font-data);
-  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  font: 700 11px var(--font-data);
+  background: var(--ax-sunken);
   color: var(--text-soft);
 }
-.sk.q { background: rgba(225, 36, 46, 0.85); color: #fff; }
-.sk.r { background: linear-gradient(180deg, #f5f6f8, var(--metal)); color: var(--ink); }
+.sk.q { background: var(--ax-text); color: var(--ink); }
+.sk.r { background: var(--crimson); color: #fff; }
 
-/* Consejo (tip) */
+/* Consejo */
 .tip {
-  font-size: 11.5px;
-  line-height: 1.35;
+  font-family: var(--ax-ui);
+  font-size: 13px;
+  line-height: 1.45;
   color: var(--text-soft);
-  border-left: 2px solid var(--metal);
-  padding-left: 8px;
+  border-left: 2px solid var(--ax-line-hov);
+  padding-left: 10px;
 }
 .tip.hot { border-left-color: var(--crimson); }
 
 /* Medallón de dragón tomado */
 .medal {
-  width: 18px; height: 18px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #23252b, #101115);
-  box-shadow: 0 0 0 1px var(--metal-dark);
+  width: 20px; height: 20px;
+  border-radius: var(--ax-r-chip);
+  background: var(--ax-sunken);
+  box-shadow: 0 0 0 1px var(--ax-line);
   display: grid;
   place-items: center;
   flex: none;
@@ -477,27 +435,16 @@ body {
 /* Scrollbars discretos */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--metal-dark); }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.26); }
 
-/* ── Jugador/campeón clicable → perfil ATAK.GG embebido ─────────────────────── */
-.atak-link {
-  cursor: pointer;
-  transition: color 0.15s, text-shadow 0.15s, transform 0.15s;
-}
-.atak-link:hover {
-  color: #ff6b73 !important;
-  text-shadow: 0 0 14px rgba(225, 36, 46, 0.45);
-}
-.atak-link-img { cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
-.atak-link-img:hover {
-  transform: scale(1.12);
-  box-shadow: 0 0 0 1.5px #e1242e, 0 0 14px rgba(225, 36, 46, 0.5) !important;
-}
+/* ── Jugador / campeón clicable → perfil ATAK.GG ──────────────────────────── */
+.atak-link { cursor: pointer; transition: color 0.15s; }
+.atak-link:hover { color: var(--ax-red-hi) !important; }
+.atak-link-img { cursor: pointer; transition: transform 0.15s; }
+.atak-link-img:hover { transform: scale(1.1); }
 
-/* ── Animaciones fluidas (EOG y vistas) ─────────────────────────────────────
-   Entradas con easing tipo Apple (cubic-bezier suave), stagger por fila y
-   hover con lift. Respetan prefers-reduced-motion. */
+/* ── Entradas ─────────────────────────────────────────────────────────────── */
 @keyframes atakFadeUp {
   from { opacity: 0; transform: translateY(14px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -507,16 +454,15 @@ body {
   to   { opacity: 1; }
 }
 @keyframes atakHeroIn {
-  from { opacity: 0; transform: translateY(10px) scale(0.985); letter-spacing: 0.35em; }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
-.anim-rise { animation: atakFadeUp 0.42s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-rise { animation: atakFadeUp 0.42s var(--ax-ease) both; }
 .anim-fade { animation: atakFadeIn 0.3s ease both; }
-.anim-hero { animation: atakHeroIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-hero { animation: atakHeroIn 0.5s var(--ax-ease) both; }
 
-/* Contenedor con stagger: cada hijo directo entra con un pequeño retraso. */
-.anim-stagger > * { animation: atakFadeUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-stagger > * { animation: atakFadeUp 0.4s var(--ax-ease) both; }
 .anim-stagger > *:nth-child(1)  { animation-delay: 0.03s; }
 .anim-stagger > *:nth-child(2)  { animation-delay: 0.07s; }
 .anim-stagger > *:nth-child(3)  { animation-delay: 0.11s; }
@@ -526,34 +472,19 @@ body {
 .anim-stagger > *:nth-child(7)  { animation-delay: 0.27s; }
 .anim-stagger > *:nth-child(8)  { animation-delay: 0.31s; }
 
-/* Fila de scoreboard: entrada + hover con lift lateral y glow del borde. */
 .eog-row {
-  animation: atakFadeUp 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
-  transition: background 0.18s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-              box-shadow 0.18s ease, border-color 0.18s ease;
-  will-change: transform;
+  animation: atakFadeUp 0.38s var(--ax-ease) both;
+  transition: background 0.18s ease;
 }
-.eog-row:hover {
-  background: rgba(255, 255, 255, 0.06) !important;
-  transform: translateX(4px);
-  box-shadow: -2px 0 12px rgba(225, 36, 46, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
+.eog-row:hover { background: rgba(255, 255, 255, 0.06) !important; }
 
-/* Tarjetas de stats (daño/cs/oro/visión) con hover sutil. */
-.eog-stat {
-  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.18s ease, background 0.18s ease;
-}
-.eog-stat:hover {
-  transform: translateY(-2px);
-  border-color: rgba(225, 36, 46, 0.4) !important;
-  background: rgba(225, 36, 46, 0.06);
-}
+.eog-stat { transition: border-color 0.18s ease, background 0.18s ease; }
+.eog-stat:hover { border-color: var(--border-crimson) !important; background: var(--ax-red-wash); }
 
-/* Scroll suave + scrollbar que aparece al pasar el mouse. */
 * { scroll-behavior: smooth; }
-::-webkit-scrollbar-thumb { transition: background 0.2s ease; }
 
 @media (prefers-reduced-motion: reduce) {
-  .anim-rise, .anim-fade, .anim-hero, .anim-stagger > *, .eog-row { animation: none; }
-  .eog-row, .eog-stat, .bar > i, .dmg-track-rail > i { transition: none; }
+  .anim-rise, .anim-fade, .anim-hero, .anim-stagger > *, .eog-row, .dot, .badge-glow { animation: none; }
+  .eog-row, .eog-stat, .bar > i, .dmg-track-rail > i, .btn { transition: none; }
+  * { scroll-behavior: auto; }
 }

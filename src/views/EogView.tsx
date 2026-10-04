@@ -286,7 +286,7 @@ function Shell({ sub, children }: { sub: string; children?: ReactNode }) {
       <div className="post-wrap">
         <header className="post-header">
           <div className="post-title">
-            <span className="post-wordmark">ATAK</span>
+            <span className="post-wordmark">ATAK<em>.GG</em></span>
             <span className="post-xs post-caps">{sub}</span>
           </div>
           <nav className="post-seg" aria-label="Fase">
@@ -610,9 +610,9 @@ function PostMatch({ eog, patch }: { eog: any; patch: PatchInfo | null }) {
             <Rise>
               <motion.div
                 className={`post-result ${resultCls}`}
-                initial={reduce ? { opacity: 0 } : { opacity: 0, letterSpacing: '0.5em', filter: 'blur(8px)' }}
-                animate={reduce ? { opacity: 1 } : { opacity: 1, letterSpacing: '0.14em', filter: 'blur(0px)' }}
-                transition={{ duration: 0.8, ease: EASE, delay: 0.1 }}
+                initial={reduce ? { opacity: 0 } : { opacity: 0, x: -28 }}
+                animate={reduce ? { opacity: 1 } : { opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, ease: EASE, delay: 0.1 }}
               >
                 {resultText}
               </motion.div>
@@ -654,7 +654,7 @@ function PostMatch({ eog, patch }: { eog: any; patch: PatchInfo | null }) {
                   parts={[
                     { text: String(focus.kda[0]) },
                     { text: ' / ', color: 'var(--faint)' },
-                    { text: String(focus.kda[1]), color: 'var(--crimson)' },
+                    { text: String(focus.kda[1]), color: 'var(--bad)' },
                     { text: ' / ', color: 'var(--faint)' },
                     { text: String(focus.kda[2]) },
                   ]}

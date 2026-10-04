@@ -1,20 +1,20 @@
-/* src/views/post.css — vista POST-PARTIDA (EogView).
-   Tokens propios de esta vista (Outfit + canvas/cyan/crimson), acotados a .post
-   para no pisar el sistema crimson/plata de styles.css.
+/* src/views/post.css — vista POST-PARTIDA (EogView) con el lenguaje "Arena"
+   del sitio: resultado en Barlow Condensed itálica, paneles opacos con
+   hairline, un solo acento crimson; verde / rojo solo para victoria / derrota.
+   Los tokens locales apuntan a --ax-* (styles.css), acotados a .post.
    Motion: solo opacity / transform / width. Nunca transition: all. */
 
 .post {
-  --canvas: #0A0C10;
-  --elev: #14181E;
-  --ink: #E7E4DE;
-  --muted: #A1A8B0;
-  --faint: #6D767E;
-  --line: rgb(255 255 255 / 0.1);
-  --cyan: #3EC6E0;
-  --cyan-dim: #14343D;
-  --crimson: #E23B4A;
-  --ok: #3DDC97;
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --canvas: var(--ax-bg);
+  --elev: var(--ax-sub);
+  --ink: var(--ax-text);
+  --muted: var(--ax-text-2);
+  --faint: var(--ax-muted);
+  --line: var(--ax-line);
+  --crimson: var(--ax-red);
+  --ok: var(--ax-green);
+  --bad: var(--ax-neg);
+  --ease: var(--ax-ease);
 
   width: 100%;
   height: 100%;
@@ -22,24 +22,24 @@
   overflow-y: auto;
   background: var(--canvas);
   color: var(--ink);
-  font-family: 'Outfit', system-ui, sans-serif;
-  font-weight: 400;
-  font-size: 14px;
+  font-family: var(--ax-data);
+  font-weight: 500;
+  font-size: 14.5px;
   line-height: 1.35;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 .post *, .post *::before, .post *::after { box-sizing: border-box; }
 .post button { font-family: inherit; font-variant-numeric: inherit; color: inherit; }
-.post :focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.post :focus-visible { outline: 2px solid var(--ax-red-hi); outline-offset: 2px; }
 
-/* Escenario cinemático detrás del contenido (fijo al viewport). */
+/* Escenario detrás del contenido (fijo al viewport). */
 /* z-index -1: vive dentro del contexto de apilamiento de .post-wrap; con 0 se
    pintaba ENCIMA del contenido no posicionado (las filas del scoreboard salían
    oscurecidas por el degradado). */
 .post-bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
-.post-bg img { width: 100%; height: 100%; object-fit: cover; object-position: center 15%; display: block; opacity: 0.28; filter: saturate(0.9) brightness(0.7); }
-.post-bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(10 12 16 / 0.35) 0%, rgb(10 12 16 / 0.85) 55%, var(--canvas) 100%); }
-.post-rankpill { margin-left: 8px; font-size: 11px; color: var(--faint); }
+.post-bg img { width: 100%; height: 100%; object-fit: cover; object-position: center 15%; display: block; opacity: 0.3; filter: saturate(0.9) brightness(0.75); }
+.post-bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10, 10, 12, 0.4) 0%, rgba(10, 10, 12, 0.88) 50%, var(--canvas) 100%); }
+.post-rankpill { margin-left: 8px; font-size: 12px; color: var(--faint); }
 
 .post-wrap {
   position: relative;
@@ -52,38 +52,43 @@
   flex-direction: column;
   gap: 16px;
 }
-@media (min-width: 1024px) { .post-wrap { padding: 24px; } }
+@media (min-width: 1024px) { .post-wrap { padding: 20px 24px 0; } }
 
-.post-xs { font-size: 12px; color: var(--muted); }
-.post-caps { text-transform: uppercase; letter-spacing: 0.14em; }
+.post-xs { font-size: 12.5px; color: var(--muted); }
+.post-caps { text-transform: uppercase; letter-spacing: 0.1em; font-size: 11.5px; font-weight: 600; color: var(--faint); }
+/* Panel opaco (el nombre "glass" viene de la piel anterior). */
 .post-glass {
-  background: rgb(18 22 28 / 0.72);
-  backdrop-filter: blur(12px);
+  background: var(--ax-card);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--ax-r-panel);
+  box-shadow: var(--ax-shadow);
 }
 
 /* ── Botones ─────────────────────────────────────────────────────────────── */
 .post-btn {
   min-height: 44px;
-  padding: 0 18px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: var(--elev);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  padding: 0 20px;
+  border-radius: var(--ax-r-ctl);
+  border: 1px solid var(--ax-line-hov);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
   cursor: pointer;
-  transition: transform 150ms ease-out, opacity 150ms ease-out;
+  transition: transform 150ms ease-out, background-color 150ms ease-out, border-color 150ms ease-out;
 }
-.post-btn:active:not(:disabled) { transform: scale(0.96); }
-.post-btn:disabled { opacity: 0.4; cursor: default; }
+.post-btn:hover:not(:disabled) { border-color: var(--crimson); background: var(--ax-red-wash); }
+.post-btn:active:not(:disabled) { transform: translateY(1px); }
+.post-btn:disabled { color: var(--ax-faint); border-color: var(--line); cursor: default; }
 .post-btn.primary {
   background: var(--crimson);
   border-color: transparent;
-  color: var(--canvas);
-  font-weight: 600;
+  color: #fff;
+  border-radius: var(--ax-r-ctl) var(--ax-r-ctl) 0 var(--ax-r-ctl);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
 }
+.post-btn.primary:hover:not(:disabled) { background: var(--ax-red-hi); border-color: transparent; }
 .post-btn.is-done { color: var(--ok); }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
@@ -97,7 +102,8 @@
 }
 .post-header button { -webkit-app-region: no-drag; }
 .post-title { grid-area: title; display: flex; align-items: baseline; gap: 12px; min-width: 0; }
-.post-wordmark { font-size: 16px; font-weight: 600; letter-spacing: 0.3em; }
+.post-wordmark { font-family: var(--ax-display); font-size: 24px; font-weight: 800; font-style: italic; line-height: 1; letter-spacing: 0.02em; }
+.post-wordmark em { font-style: inherit; color: var(--crimson); }
 .post-close {
   grid-area: close;
   justify-self: end;
@@ -107,45 +113,50 @@
   display: grid;
   place-items: center;
   color: var(--muted);
+  background: transparent;
+  border-color: var(--line);
 }
+.post-close:hover:not(:disabled) { background: var(--crimson); border-color: var(--crimson); color: #fff; }
 .post-seg {
   grid-area: seg;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 4px;
   padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--elev);
+  border: 1px solid var(--ax-line-soft);
+  border-radius: 8px;
+  background: var(--ax-strip);
 }
 .post-seg button {
-  min-height: 44px;
-  padding: 0 16px;
+  min-height: 36px;
+  padding: 0 18px;
   border: none;
-  border-radius: 8px;
+  border-radius: 5px;
   background: transparent;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   color: var(--muted);
   cursor: pointer;
-  transition: transform 150ms ease-out, opacity 150ms ease-out;
+  transition: transform 150ms ease-out, background-color 150ms ease-out, color 150ms ease-out;
 }
-.post-seg button:active:not(:disabled) { transform: scale(0.96); }
-.post-seg button:disabled { color: var(--faint); cursor: default; }
-.post-seg button.is-active { background: var(--cyan-dim); color: var(--cyan); }
+.post-seg button:hover:not(:disabled):not(.is-active) { color: var(--ink); background: rgba(255, 255, 255, 0.05); }
+.post-seg button:active:not(:disabled) { transform: scale(0.97); }
+.post-seg button:disabled { color: var(--ax-faint); cursor: default; }
+.post-seg button.is-active { background: var(--ink); color: #0a0a0c; }
 @media (min-width: 640px) {
   .post-header { grid-template-columns: 1fr auto 1fr; grid-template-areas: 'title seg close'; }
 }
 
 /* ── Hero ────────────────────────────────────────────────────────────────── */
-.post-hero { display: grid; gap: 16px; padding: 16px; }
+.post-hero { position: relative; overflow: hidden; display: grid; gap: 18px; padding: 16px; background: linear-gradient(180deg, #17121a 0%, var(--ax-card) 100%); }
+.post-hero::before { content: ''; position: absolute; left: 0; top: 0; width: 56px; height: 3px; background: var(--crimson); }
 @media (min-width: 768px) { .post-hero { grid-template-columns: 180px 1fr; } }
 
 .post-portrait {
   position: relative;
   height: 176px;
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
   background: var(--elev);
 }
@@ -160,13 +171,13 @@
   display: block;
 }
 .post-portrait-cap { margin-top: 8px; }
-.post-portrait-cap b { display: block; font-size: 16px; font-weight: 600; }
+.post-portrait-cap b { display: block; font-family: var(--ax-display); font-size: 22px; font-weight: 700; line-height: 1.1; text-transform: uppercase; letter-spacing: 0.02em; }
 
 .post-hero-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.post-result { font-size: 30px; font-weight: 600; letter-spacing: 0.14em; line-height: 1.1; }
-@media (min-width: 768px) { .post-result { font-size: 36px; } }
+.post-result { font-family: var(--ax-display); font-size: 48px; font-weight: 800; font-style: italic; letter-spacing: 0.01em; line-height: 0.95; text-transform: uppercase; }
+@media (min-width: 768px) { .post-result { font-size: 60px; } }
 .post-result.win { color: var(--ok); }
-.post-result.loss { color: var(--crimson); }
+.post-result.loss { color: var(--bad); }
 .post-result.neutral { color: var(--muted); }
 
 .post-rank {
@@ -175,84 +186,91 @@
   align-items: center;
   gap: 8px 16px;
   padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--elev);
+  border: 1px solid var(--ax-line-soft);
+  border-radius: 8px;
+  background: var(--ax-strip);
 }
-.post-rank b { font-weight: 600; }
+.post-rank b { font-weight: 700; }
 .post-rail {
   display: block;
   flex: 1 1 120px;
   min-width: 0;
   height: 6px;
-  border-radius: 3px;
-  background: rgb(255 255 255 / 0.08);
+  border-radius: 2px;
+  background: var(--ax-sunken-2);
   overflow: hidden;
 }
-.post-rail > i { border-radius: 3px; background: var(--cyan); }
+.post-rail > i { border-radius: 2px; background: var(--ink); }
 .post-rail.up > i { background: var(--ok); }
-.post-rail.down > i, .post-rail.dmg > i { background: var(--crimson); }
+.post-rail.down > i { background: var(--bad); }
+.post-rail.dmg > i { background: var(--crimson); }
 .is-ok { color: var(--ok); }
-.is-bad { color: var(--crimson); }
+.is-bad { color: var(--bad); }
 
 .post-identity { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+/* Nota de la partida: bloque como las posiciones del sitio; la S va en oro. */
 .post-grade {
   flex: none;
   width: 56px;
   height: 56px;
-  border-radius: 50%;
-  border: 1px solid var(--line);
-  background: var(--elev);
+  border-radius: var(--ax-r-ctl);
+  background: var(--ax-sunken);
   display: grid;
   place-items: center;
-  font-size: 24px;
-  font-weight: 600;
+  font-family: var(--ax-display);
+  font-size: 34px;
+  font-weight: 800;
+  font-style: italic;
+  line-height: 1;
 }
-.post-grade.top { border-color: var(--cyan); color: var(--cyan); }
-.post-kda { font-size: 28px; font-weight: 600; line-height: 1.1; }
+.post-grade.top { background: var(--ax-gold); color: #17130a; }
+.post-kda { font-family: var(--ax-display); font-size: 38px; font-weight: 700; line-height: 1; }
 .post-items { display: flex; gap: 4px; margin-left: auto; }
 .post-item {
   flex: none;
   width: 36px;
   height: 36px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--elev);
+  border-radius: var(--ax-r-chip);
+  outline: 1px solid var(--line);
+  outline-offset: -1px;
+  background: var(--ax-sunken);
   overflow: hidden;
 }
-.post-item.sm { width: 20px; height: 20px; border-radius: 4px; }
-.post-item.empty { opacity: 0.35; }
+.post-item.sm { width: 22px; height: 22px; border-radius: 3px; }
+.post-item.empty { opacity: 0.4; }
 .post-item img { display: block; width: 100%; height: 100%; object-fit: cover; }
 @media (max-width: 639px) { .post-items { margin-left: 0; } }
 
 .post-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
-.post-stat { padding: 8px 12px; border-radius: 8px; background: var(--elev); min-width: 0; }
-.post-stat b { display: block; font-size: 18px; font-weight: 600; }
-.post-stat small { font-size: 12px; color: var(--faint); font-weight: 400; }
+.post-stat { padding: 8px 12px 10px; border: 1px solid var(--ax-line-soft); border-radius: 8px; background: var(--elev); min-width: 0; }
+.post-stat b { display: block; font-family: var(--ax-display); font-size: 26px; font-weight: 700; line-height: 1.05; }
+.post-stat small { font-family: var(--ax-data); font-size: 12.5px; color: var(--faint); font-weight: 500; }
 
 /* ── Tabs ────────────────────────────────────────────────────────────────── */
-.post-tabs { position: relative; display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.post-tabs { position: relative; display: flex; gap: 2px; border-bottom: 1px solid var(--line); }
 .post-tabs button {
   min-height: 44px;
   padding: 0 16px;
   border: none;
-  border-radius: 8px 8px 0 0;
   background: transparent;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
+  font-family: var(--ax-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
   color: var(--muted);
   cursor: pointer;
-  transition: transform 150ms ease-out, opacity 150ms ease-out;
+  transition: transform 150ms ease-out, color 150ms ease-out;
 }
-.post-tabs button:active { transform: scale(0.96); }
-.post-tabs button.is-active { color: var(--ink); }
+.post-tabs button:hover { color: var(--ink); }
+.post-tabs button:active { transform: scale(0.97); }
+.post-tabs button.is-active { color: #fff; }
 .post-tab-line {
   position: absolute;
   left: 0;
   bottom: -1px;
   width: 100px;
-  height: 2px;
+  height: 3px;
   background: var(--crimson);
   transform-origin: 0 50%;
   pointer-events: none;
@@ -260,61 +278,65 @@
 .post-panel { flex: 1 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
 /* ── Scoreboard ──────────────────────────────────────────────────────────── */
-.post-team { display: flex; flex-direction: column; gap: 4px; }
+.post-team { display: flex; flex-direction: column; gap: 3px; }
 .post-team-head { display: flex; justify-content: space-between; align-items: baseline; padding: 0 12px 4px; }
-.post-team-head .ally { color: var(--cyan); }
-.post-team-head .enemy { color: var(--crimson); }
-.post-team-head b { font-weight: 600; letter-spacing: 0.14em; font-size: 12px; }
+.post-team-head .ally { color: var(--ax-blue); }
+.post-team-head .enemy { color: var(--ax-red-hi); }
+.post-team-head b { font-family: var(--ax-display); font-weight: 700; letter-spacing: 0.07em; font-size: 16px; }
 
 .post-cols, .post-row {
   display: grid;
-  grid-template-columns: 1.3fr 5.5rem 9.5rem 1fr 3.5rem 3rem 3rem;
+  grid-template-columns: 1.3fr 5.5rem 10.5rem 1fr 3.5rem 3rem 3rem;
   gap: 12px;
   align-items: center;
 }
-.post-cols { padding: 0 13px; font-size: 11px; letter-spacing: 0.14em; color: var(--faint); }
+.post-cols { padding: 0 13px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.1em; color: var(--faint); }
 .post-cols .r, .post-meta > span { text-align: right; }
 .post-row {
   width: 100%;
   min-height: 56px;
-  padding: 8px 12px;
+  padding: 7px 12px;
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: var(--ax-r-ctl);
   background-color: transparent;
   text-align: left;
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
   transition: background-color 150ms ease-out, transform 150ms ease-out;
 }
-.post-row:hover { background-color: var(--elev); }
-.post-row:active { transform: scale(0.96); }
-.post-row.is-focus { border-color: var(--cyan); background-color: var(--cyan-dim); }
+.post-row:hover { background-color: rgba(255, 255, 255, 0.045); }
+.post-row:active { transform: scale(0.99); }
+/* Jugador en foco: marco claro (el activo del sitio). */
+.post-row.is-focus { border-color: rgba(255, 255, 255, 0.55); background-color: var(--ax-sunken); }
 .post-row > span { min-width: 0; }
 
 .post-cell-player { display: flex; align-items: center; gap: 12px; }
-.post-face { flex: none; width: 40px; height: 40px; border-radius: 8px; background: var(--elev); overflow: hidden; }
-.post-face img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.post-face { flex: none; width: 40px; height: 40px; border-radius: var(--ax-r-chip); background: var(--ax-sunken); overflow: hidden; }
+.post-face img { display: block; width: 100%; height: 100%; object-fit: cover; transform: scale(1.1); }
 .post-who { display: block; min-width: 0; }
 .post-who b, .post-who em { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.post-who b { font-weight: 500; }
-.post-who b i { font-style: normal; color: var(--cyan); }
-.post-who em { font-style: normal; font-size: 12px; color: var(--faint); }
+.post-who b { font-size: 15px; font-weight: 600; }
+.post-who b i { font-style: normal; font-weight: 700; color: var(--ax-red-hi); }
+.post-who em { font-style: normal; font-size: 12.5px; color: var(--faint); }
 .post-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .post-badge {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: var(--ax-r-chip);
+  border: 1px solid rgba(182, 182, 192, 0.36);
+  background: rgba(182, 182, 192, 0.12);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
   color: var(--muted);
   white-space: nowrap;
 }
-.post-cell-kda { font-weight: 500; white-space: nowrap; }
-.post-cell-kda i { font-style: normal; color: var(--faint); }
+.post-cell-kda { font-size: 15px; font-weight: 700; white-space: nowrap; }
+.post-cell-kda i { font-style: normal; font-weight: 500; color: var(--ax-faint); }
 .post-cell-items { display: flex; gap: 2px; }
 .post-cell-dmg { display: flex; flex-direction: column; gap: 4px; }
 .post-cell-dmg .post-rail { flex: none; width: 100%; }
-.post-cell-dmg > span:last-child { font-size: 12px; color: var(--muted); }
+.post-cell-dmg > span:last-child { font-size: 12.5px; color: var(--muted); }
 .post-meta { display: contents; color: var(--muted); }
 
 /* Móvil: la fila se apila, sin scroll horizontal. */
@@ -329,51 +351,51 @@
   .post-cell-kda { grid-area: kda; }
   .post-cell-items { grid-area: items; }
   .post-cell-dmg { grid-area: dmg; }
-  .post-meta { grid-area: meta; display: flex; gap: 12px; justify-content: flex-end; font-size: 12px; }
-  .post-meta > span::before { content: attr(data-label) ' '; color: var(--faint); font-size: 10px; letter-spacing: 0.1em; }
+  .post-meta { grid-area: meta; display: flex; gap: 12px; justify-content: flex-end; font-size: 12.5px; }
+  .post-meta > span::before { content: attr(data-label) ' '; color: var(--faint); font-size: 11px; letter-spacing: 0.08em; }
 }
 
 /* ── Mapa (lista de eventos) ─────────────────────────────────────────────── */
 .post-events { list-style: none; margin: 0; padding: 4px 16px; }
-.post-events li { display: flex; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.post-events li { display: flex; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--ax-line-soft); }
 .post-events li:last-child { border-bottom: none; }
-.post-events time { flex: none; width: 3.5rem; color: var(--cyan); font-weight: 500; }
+.post-events time { flex: none; width: 3.5rem; font-family: var(--ax-display); font-size: 17px; font-weight: 700; line-height: 1.15; color: var(--muted); }
 .post-empty { padding: 24px 16px; color: var(--muted); }
 
 /* ── Análisis ────────────────────────────────────────────────────────────── */
 .post-analysis { display: grid; gap: 16px; padding: 16px; }
 @media (min-width: 768px) { .post-analysis { grid-template-columns: 1fr 1fr; } }
-.post-analysis h3 { margin: 0 0 8px; font-size: 12px; font-weight: 500; letter-spacing: 0.14em; color: var(--muted); }
+.post-analysis h3 { margin: 0 0 8px; font-family: var(--ax-display); font-size: 15px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink); }
 .post-runes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .post-skills { display: flex; flex-wrap: wrap; gap: 4px; }
 .post-skill {
   width: 28px;
   height: 28px;
-  border-radius: 8px;
-  background: var(--elev);
-  border: 1px solid var(--line);
+  border-radius: var(--ax-r-chip);
+  background: var(--ax-sunken);
   display: grid;
   place-items: center;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
 }
-.post-skill.r { color: var(--cyan); border-color: var(--cyan); }
-.post-quote { grid-column: 1 / -1; margin: 0; font-size: 15px; color: var(--ink); }
+.post-skill.r { background: var(--crimson); color: #fff; }
+.post-quote { grid-column: 1 / -1; margin: 0; font-family: var(--ax-ui); font-size: 15px; line-height: 1.5; color: var(--ink); }
 .post-link {
   justify-self: start;
   min-height: 44px;
   padding: 0;
   border: none;
   background: none;
-  color: var(--cyan);
-  font-size: 12px;
-  letter-spacing: 0.1em;
+  color: var(--ax-red-hi) !important;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   cursor: pointer;
 }
+.post-link:hover { color: #fff !important; }
 .post-duel { padding: 16px; }
-/* El análisis de duelo (EogRuneAnalysis) usa los paneles del sistema viejo:
-   aquí solo se le redondean para que no desentone. */
-.post-duel .panel { border-radius: 12px; border-color: var(--line); background: var(--elev); }
+.post-duel .panel { border-radius: 8px; border-color: var(--ax-line-soft); background: var(--elev); box-shadow: none; }
 
 /* ── Footer ──────────────────────────────────────────────────────────────── */
 .post-footer {
@@ -384,7 +406,7 @@
   justify-content: flex-end;
   gap: 12px;
   margin-top: auto;
-  padding: 12px 0;
+  padding: 12px 0 14px;
   background: var(--canvas);
   border-top: 1px solid var(--line);
 }

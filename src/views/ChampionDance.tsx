@@ -214,11 +214,10 @@ export default function ChampionDance(props: {
         position: 'relative',
         width: '100%',
         height,
-        borderRadius: 12,
+        borderRadius: 10,
         overflow: 'hidden',
-        background: 'radial-gradient(ellipse 70% 60% at 50% 45%, rgba(225,36,46,.14), rgba(0,0,0,0) 70%)',
-        border: '1px solid rgba(200,205,214,.18)',
-        boxShadow: '0 0 28px rgba(225,36,46,.2)',
+        background: 'radial-gradient(ellipse 70% 40% at 50% 100%, rgba(232,50,60,.28), rgba(0,0,0,0) 70%)',
+        border: '1px solid rgba(255,255,255,.09)',
         ...style,
       }}
     >
@@ -242,13 +241,13 @@ export default function ChampionDance(props: {
           <span className="dot" />
         </div>
       )}
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '20px 10px 8px', background: 'linear-gradient(transparent,rgba(0,0,0,.88))', zIndex: 3, pointerEvents: 'none' }}>
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '20px 10px 8px', background: 'linear-gradient(transparent,rgba(8,8,10,.92))', zIndex: 3, pointerEvents: 'none' }}>
         {caption && (
-          <div style={{ fontSize: 8.5, letterSpacing: '0.16em', color: '#c8aa6e', fontWeight: 700, textTransform: 'uppercase' }}>
+          <div style={{ fontSize: 11, letterSpacing: '0.1em', color: '#b6b6c0', fontWeight: 600, textTransform: 'uppercase' }}>
             {caption}
           </div>
         )}
-        <div className="display" style={{ fontWeight: 700, fontSize: 13, letterSpacing: '0.08em', textAlign: caption ? 'left' : 'center' }}>
+        <div className="display" style={{ fontWeight: 700, fontSize: 17, lineHeight: 1.1, letterSpacing: '0.03em', textTransform: 'uppercase', textAlign: caption ? 'left' : 'center' }}>
           {championName || '—'}
         </div>
       </div>

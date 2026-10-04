@@ -115,17 +115,15 @@ export default function BounceCards({
               width: cardWidth,
               height: cardHeight,
               transformOrigin: 'center bottom',
-              borderRadius: 10,
+              borderRadius: 8,
               overflow: 'hidden',
               cursor: clickable ? 'pointer' : 'default',
               position: 'relative',
-              background: 'linear-gradient(160deg, #1c1e28, #0a0b10)',
+              background: '#18181d',
               border: item.selected
-                ? '1px solid rgba(225,36,46,.9)'
-                : '1px solid rgba(200,170,110,.35)',
-              boxShadow: item.selected
-                ? '0 10px 22px rgba(0,0,0,.5), 0 0 16px rgba(225,36,46,.45)'
-                : '0 10px 22px rgba(0,0,0,.5), 0 0 0 1px rgba(0,0,0,.3)',
+                ? '2px solid #e8323c'
+                : '1px solid rgba(255,255,255,.2)',
+              boxShadow: '0 10px 22px -8px rgba(0,0,0,.7)',
               flex: 'none',
             }}
             onClick={item.onClick}
@@ -144,13 +142,13 @@ export default function BounceCards({
             {(item.label || item.sublabel) && (
               <div style={{
                 position: 'absolute', left: 0, right: 0, bottom: 0,
-                padding: '16px 5px 5px',
-                background: 'linear-gradient(transparent, rgba(0,0,0,.92))',
+                padding: '22px 5px 6px',
+                background: 'linear-gradient(transparent, rgba(8,8,10,.95))',
                 pointerEvents: 'none',
               }}>
                 {item.label && (
                   <div style={{
-                    fontSize: 10, fontWeight: 800, color: '#fff', letterSpacing: '0.04em',
+                    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, lineHeight: 1.1, fontWeight: 700, color: '#fff', letterSpacing: '0.02em', textTransform: 'uppercase',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center',
                   }}>
                     {item.label}
@@ -158,7 +156,7 @@ export default function BounceCards({
                 )}
                 {item.sublabel && (
                   <div style={{
-                    fontSize: 9, fontWeight: 700, color: '#c8aa6e', textAlign: 'center', marginTop: 1,
+                    fontSize: 11.5, fontWeight: 600, color: '#b6b6c0', textAlign: 'center', marginTop: 1,
                   }}>
                     {item.sublabel}
                   </div>

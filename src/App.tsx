@@ -1,6 +1,6 @@
 // src/App.tsx — router por ventana (?view=main|hud|champselect|scoreboard|players|eog|caster)
-// Diseño definitivo (design/ATAK-Screens.html): crimson #E1242E · plata/cromo ·
-// negro #0A0A0C. Las vistas viven en src/views/* y consumen los datos reales de
+// Diseño "Arena" (el del sitio ATAK.GG; tokens --ax-* en styles.css): crimson ·
+// Barlow Condensed · paneles opacos. Las vistas viven en src/views/* y consumen los datos reales de
 // la capa Electron vía window.atak (declarado abajo).
 import { useEffect, useState, type ReactNode } from 'react';
 import { MotionConfig, motion } from 'framer-motion';

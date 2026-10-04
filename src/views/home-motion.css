@@ -1,9 +1,7 @@
-/* src/views/home-motion.css — piel hextech + pulido de movimiento de MainView (.hm).
-   Complementa hextech.css (paneles, botones, pills) con lo que la ventana
-   principal necesita y el kit no trae: riel con marcador dorado/cian, inputs
-   del formulario de caster, diamantes de estado, enlaces y hover de cards.
-   Solo opacity / transform / color / filter; 150ms en hover; press scale .96.
-   Todo con scope .hm para no pisar styles.css ni hextech.css. */
+/* src/views/home-motion.css — ventana principal (MainView, scope .hm) sobre el
+   kit Arena (hextech.css): riel con marcador crimson, formulario de caster,
+   indicadores de estado, enlaces y hover de cards.
+   Solo opacity / transform / color; 150ms en hover; press scale .96. */
 
 /* ── Riel de navegación: botones + marcador compartido (layoutId) ───────── */
 .hm-rail {
@@ -14,8 +12,8 @@
   align-items: center;
   padding: 14px 0;
   gap: 6px;
-  border-right: 1px solid var(--hx-gold-faint);
-  background: linear-gradient(180deg, rgb(7 10 18 / 0.75), rgb(7 10 18 / 0.45));
+  border-right: 1px solid var(--hx-line);
+  background: var(--hx-bg-2);
 }
 .hm-rail-btn {
   position: relative;
@@ -25,81 +23,76 @@
   display: grid;
   place-items: center;
   border: 0;
+  border-radius: var(--ax-r-ctl);
   background: none;
   color: var(--hx-muted);
   transition: color 150ms, transform 150ms var(--hx-ease);
 }
-.hm-rail-btn:hover { color: var(--hx-gold-bright); }
+.hm-rail-btn:hover { color: var(--hx-ink); }
 .hm-rail-btn:active { transform: scale(0.94); }
-.hm-rail-btn.active { color: var(--hx-cyan); }
-.hm-rail-btn.active svg { filter: drop-shadow(0 0 6px rgb(10 200 185 / 0.75)); }
-/* Marcador hextech: hairline dorado por dentro, borde dorado a la izquierda y halo cian. */
+.hm-rail-btn.active { color: #fff; }
+/* Marcador: lavado crimson con carril a la izquierda (el activo del sitio). */
 .hm-rail-ind {
   position: absolute;
-  inset: 3px;
+  inset: 2px;
   z-index: -1;
   pointer-events: none;
-  background: linear-gradient(180deg, rgb(10 200 185 / 0.16), rgb(10 200 185 / 0.04));
-  box-shadow:
-    inset 0 0 0 1px var(--hx-gold-dim),
-    inset 0 0 12px rgb(10 200 185 / 0.18),
-    0 0 16px rgb(10 200 185 / 0.35);
+  border-radius: var(--ax-r-ctl);
+  background: var(--ax-red-wash);
+  box-shadow: inset 2px 0 0 var(--hx-crimson);
 }
-.hm-rail-ind::before {
-  content: '';
-  position: absolute;
-  left: -1px;
-  top: 5px;
-  bottom: 5px;
-  width: 2px;
-  background: var(--hx-gold);
-  box-shadow: 0 0 6px rgb(200 170 110 / 0.6);
-}
-/* Punto de aviso en el riel (en partida = cian, transmitiendo = carmesí). */
+/* Punto de aviso en el riel (en partida = verde, transmitiendo = crimson). */
 .hm-rail-dot {
   position: absolute;
   top: 7px;
   right: 7px;
-  width: 6px;
-  height: 6px;
-  transform: rotate(45deg);
-  background: var(--hx-cyan);
-  box-shadow: 0 0 8px var(--hx-cyan);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--hx-green);
   animation: hm-pulse 1.4s ease-in-out infinite alternate;
 }
-.hm-rail-dot.live { background: var(--hx-crimson); box-shadow: 0 0 8px var(--hx-crimson); }
+.hm-rail-dot.live { background: var(--hx-crimson); }
 @keyframes hm-pulse { from { opacity: 0.45; } to { opacity: 1; } }
 
-/* ── Diamante de estado (conectado = cian, apagado = carmesí/tenue) ────────── */
+/* ── Indicador de estado (conectado = verde, sin conexión = rojo, neutro = gris) ── */
 .hm-diamond {
   display: inline-block;
   flex: none;
   width: 8px;
   height: 8px;
-  transform: rotate(45deg);
+  border-radius: 50%;
   background: var(--hx-faint);
-  transition: background-color 250ms, box-shadow 250ms;
+  transition: background-color 250ms;
 }
-.hm-diamond.on { background: var(--hx-cyan); box-shadow: 0 0 8px rgb(10 200 185 / 0.8); }
-.hm-diamond.off { background: var(--hx-crimson); box-shadow: 0 0 8px rgb(225 36 46 / 0.6); }
+.hm-diamond.on { background: var(--hx-green); }
+.hm-diamond.off { background: var(--hx-neg); }
 
-/* ── Cards: velo claro al pasar el cursor (los degradados no transicionan) ── */
-.hm-card { transition: filter 150ms; }
-.hm-card:hover { filter: brightness(1.08); }
+/* ── Cabecera de pestaña: raya crimson + título en itálica ───────────────── */
+.hm-kicker { width: 28px; height: 3px; flex: none; background: var(--hx-crimson); }
+.hm-title { font-size: 30px; line-height: 1; text-transform: uppercase; white-space: nowrap; }
+
+/* ── Héroe del invocador ─────────────────────────────────────────────────── */
+.hm-hero-name { font-size: 34px; line-height: 1.05; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-hero-tag { font-family: var(--hx-display); font-size: 18px; font-weight: 600; color: var(--hx-muted); }
+.hm-sep { width: 1px; align-self: stretch; background: var(--hx-line); }
+
+/* ── Cards: borde que se enciende al pasar el cursor ─────────────────────── */
+.hm-card { transition: border-color 150ms; }
+.hm-card:hover { border-color: var(--hx-line-strong); }
 
 /* ── Botones del kit en tamaño compacto para la barra y las cards ─────────── */
-.hm .hx-btn.sm { min-height: 28px; padding: 0 12px; font-size: 10.5px; letter-spacing: 0.12em; --cut: 6px; }
+.hm .hx-btn.sm { min-height: 30px; padding: 0 12px; font-size: 12px; }
 .hm .hx-btn.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; }
-.hm .hx-btn.big { min-height: 44px; padding: 0 26px; font-size: 13px; letter-spacing: 0.16em; --cut: 10px; }
-.hm .hx-btn.big:disabled { box-shadow: inset 0 0 0 1px rgb(225 36 46 / 0.5); }
+.hm .hx-btn.row .keys { font-size: 12px; font-weight: 600; letter-spacing: 0.02em; text-transform: none; color: var(--hx-muted); }
+.hm .hx-btn.big { min-height: 44px; padding: 0 26px; font-size: 14px; }
 .hm .hx-btn .hm-live {
   display: inline-block;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   margin-right: 8px;
-  transform: rotate(45deg);
+  border-radius: 50%;
   background: #fff;
-  box-shadow: 0 0 6px #fff;
   animation: hm-pulse 1.2s ease-in-out infinite alternate;
 }
 
@@ -107,92 +100,83 @@
 .hm .hx-seg { flex: none; }
 .hm .hx-seg button { white-space: nowrap; }
 
-/* ── Enlace al perfil (texto cromado): subrayado dorado al pasar el cursor ─── */
+/* ── Enlace al perfil: subrayado crimson al pasar el cursor ──────────────── */
 .hm-link { cursor: pointer; position: relative; display: inline-block; }
 .hm-link::after {
   content: '';
   position: absolute;
-  left: 0; right: 0; bottom: -2px;
-  height: 1px;
-  background: var(--hx-gold);
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: var(--hx-crimson);
   opacity: 0;
   transition: opacity 150ms;
 }
 .hm-link:hover::after { opacity: 1; }
 
 /* ── Formulario de caster ─────────────────────────────────────────────────── */
-.hm-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.hm-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .hm-input {
   width: 100%;
-  min-height: 34px;
+  min-height: 38px;
   padding: 6px 10px;
-  background: rgb(7 10 18 / 0.7);
-  border: 1px solid var(--hx-gold-faint);
+  background: var(--hx-bg-2);
+  border: 1px solid var(--hx-line);
+  border-radius: var(--ax-r-ctl);
   color: var(--hx-ink);
   font-family: var(--hx-data);
-  font-size: 13px;
+  font-size: 14px;
   outline: none;
   user-select: text;
-  transition: border-color 150ms, box-shadow 150ms;
+  transition: border-color 150ms;
 }
 .hm-input::placeholder { color: var(--hx-faint); }
-.hm-input:hover:not(:disabled) { border-color: var(--hx-gold-dim); }
-.hm-input:focus { border-color: var(--hx-cyan); box-shadow: 0 0 0 1px rgb(10 200 185 / 0.35), 0 0 12px rgb(10 200 185 / 0.2); }
+.hm-input:hover:not(:disabled) { border-color: var(--hx-line-strong); }
+.hm-input:focus { border-color: var(--hx-crimson); }
 .hm-input:disabled { opacity: 0.55; cursor: default; }
-.hm-input.mono { font-family: var(--hx-mono); font-size: 12px; }
+.hm-input.mono { font-family: var(--hx-mono); font-size: 13.5px; }
 .hm-color {
-  width: 38px;
-  height: 34px;
+  width: 40px;
+  height: 38px;
   flex: none;
-  padding: 2px;
-  border: 1px solid var(--hx-gold-faint);
-  background: rgb(7 10 18 / 0.7);
+  padding: 3px;
+  border: 1px solid var(--hx-line);
+  border-radius: var(--ax-r-ctl);
+  background: var(--hx-bg-2);
   cursor: pointer;
 }
 .hm-color:disabled { opacity: 0.55; cursor: default; }
 
-/* Numeral de paso (rótulo de capítulo) */
+/* Numeral de paso */
 .hm-step {
   font-family: var(--hx-display);
-  font-weight: 700;
-  font-size: 18px;
+  font-weight: 800;
+  font-style: italic;
+  font-size: 22px;
   line-height: 1;
   color: var(--hx-crimson);
-  text-shadow: 0 0 12px rgb(225 36 46 / 0.5);
 }
+.hm-steprow { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.hm-steprow .hx-label { font-family: var(--hx-display); font-size: 15px; font-weight: 700; letter-spacing: 0.07em; color: var(--hx-ink); }
+
+/* Texto de ayuda */
+.hm-help { font-family: var(--ax-ui); font-size: 13px; line-height: 1.6; color: var(--hx-ink-2); }
+.hm-help b { color: var(--hx-ink); font-weight: 600; }
+
+/* Registro de envío (tira de datos) */
+.hm-bug { display: flex; align-items: center; gap: 24px; padding: 10px 16px; border: 1px solid var(--hx-line-soft); border-radius: 8px; background: var(--hx-bg-2); }
+.hm-bug-value { font-family: var(--hx-display); font-weight: 700; font-size: 22px; line-height: 1.1; color: #fff; }
+.hm-bug-sep { width: 1px; height: 30px; background: var(--hx-line); }
+
+/* Barra de la pestaña ATAK.GG */
+.hm-webbar { height: 44px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-bottom: 1px solid var(--hx-line); background: var(--hx-bg-2); }
 
 /* Foco visible coherente con el kit */
 .hm .hm-rail-btn:focus-visible,
 .hm .hm-input:focus-visible,
-.hm .hm-color:focus-visible { outline: 2px solid var(--hx-cyan); outline-offset: 2px; }
-
-/* ── PlayersView (reglas heredadas; sin uso actual, se conservan) ─────────── */
-/* La fila/columna bajo el cursor sube de capa: el popup de form no queda tapado
-   por la card siguiente aunque el wrapper animado cree stacking context. */
-.pv-col:hover, .pv-row:hover { position: relative; z-index: 5; }
-
-/* Hover de card: velo claro encima del degradado (los degradados no transicionan) */
-.pv-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.035);
-  opacity: 0;
-  transition: opacity 150ms;
-  pointer-events: none;
-}
-.pv-card:hover::after { opacity: 1; }
-
-/* Skeleton de carga */
-@keyframes pv-pulse {
-  from { opacity: 0.18; }
-  to { opacity: 0.42; }
-}
-.pv-skel { animation: pv-pulse 0.9s ease-in-out infinite alternate; }
+.hm .hm-color:focus-visible { outline: 2px solid var(--hx-crimson-hi); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   .hm-rail-btn:active { transform: none; }
   .hm-rail-btn { transition: color 150ms; }
   .hm-rail-dot, .hm .hx-btn .hm-live { animation: none; }
-  .pv-skel { animation: none; }
 }

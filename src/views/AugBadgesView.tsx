@@ -19,13 +19,13 @@ type Payload = { matches: Offer[]; championName: string } | Offer[] | null;
 
 // Sinergia con el campeón = tier OP.GG del augment PARA ese campeón (1 = OP).
 const SYNERGY = [
-  { min: 0, label: 'SINERGIA ALTA', color: '#3DDC97' },
-  { min: 3, label: 'BUENA SINERGIA', color: '#3EC6E0' },
-  { min: 4, label: 'SINERGIA MEDIA', color: '#E8C063' },
-  { min: 5, label: 'SINERGIA BAJA', color: '#E23B4A' },
+  { min: 0, label: 'SINERGIA ALTA', color: '#3ddc97' },
+  { min: 3, label: 'BUENA SINERGIA', color: '#6db3ff' },
+  { min: 4, label: 'SINERGIA MEDIA', color: '#f5a524' },
+  { min: 5, label: 'SINERGIA BAJA', color: '#ff6b76' },
 ];
 const synergyOf = (tier: number) => {
-  if (!tier) return { label: 'SIN DATOS', color: '#8b8f9a' };
+  if (!tier) return { label: 'SIN DATOS', color: '#8c8c98' };
   let out = SYNERGY[0];
   for (const s of SYNERGY) if (tier >= s.min) out = s;
   return out;
@@ -53,7 +53,7 @@ export default function AugBadgesView() {
   const maxPick = Math.max(1, ...(offers ?? []).map((o) => o.augment.pickRate));
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden', fontFamily: "'Outfit', 'Saira Condensed', sans-serif" }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden', fontFamily: 'var(--ax-data)' }}>
       <AnimatePresence>
         {(offers ?? []).map((o) => {
           const syn = synergyOf(o.augment.tier);
@@ -79,8 +79,8 @@ export default function AugBadgesView() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1, transition: { duration: 0.3, delay: 0.5 } }}
                   style={{
-                    fontSize: 11, fontWeight: 600, letterSpacing: '0.2em',
-                    color: '#ffd25e', textShadow: '0 0 12px rgba(255,210,94,0.8)',
+                    padding: '2px 9px', borderRadius: 4, background: '#c8aa6e',
+                    fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', color: '#17130a',
                   }}
                 >
                   RECOMENDADO
@@ -88,30 +88,29 @@ export default function AugBadgesView() {
               )}
               <div style={{
                 width: '100%',
-                padding: '10px 12px 12px', borderRadius: 14,
-                background: 'rgba(8,10,14,0.9)',
-                border: `1px solid ${isBest ? 'rgba(255,210,94,0.7)' : 'rgb(255 255 255 / 0.14)'}`,
-                boxShadow: isBest ? '0 8px 28px rgba(0,0,0,0.6), 0 0 24px rgba(255,210,94,0.2)' : '0 8px 28px rgba(0,0,0,0.6)',
-                backdropFilter: 'blur(10px)',
-                color: '#E7E4DE',
+                padding: '10px 12px 12px', borderRadius: 10,
+                background: 'rgba(18,18,22,0.96)',
+                border: `1px solid ${isBest ? '#c8aa6e' : 'rgba(255,255,255,0.14)'}`,
+                boxShadow: '0 12px 28px -10px rgba(0,0,0,0.85)',
+                color: '#f5f5f6',
               }}>
                 {/* Nombre + rareza */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <span style={{ fontFamily: 'var(--ax-display)', fontSize: 19, lineHeight: 1.1, fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {o.augment.name}
                   </span>
-                  <span style={{ fontSize: 9, letterSpacing: '0.14em', color: '#6D767E', flex: 'none' }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', color: '#8c8c98', flex: 'none' }}>
                     {RARITY[o.augment.rarity] ?? ''}
                   </span>
                 </div>
 
                 {/* Sinergia con el campeón en uso */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                  <span style={{ fontSize: 10, letterSpacing: '0.12em', color: syn.color, fontWeight: 600 }}>
+                  <span style={{ fontSize: 11.5, letterSpacing: '0.08em', color: syn.color, fontWeight: 700 }}>
                     {syn.label}{champion ? ` · ${champion.toUpperCase()}` : ''}
                   </span>
                   {o.augment.performance > 0 && (
-                    <span style={{ fontSize: 10, color: '#A1A8B0', fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={{ fontSize: 11.5, color: '#b6b6c0', fontVariantNumeric: 'tabular-nums' }}>
                       rendimiento {o.augment.performance}
                     </span>
                   )}
@@ -119,19 +118,19 @@ export default function AugBadgesView() {
 
                 {/* Barra de % de pickeo (ancho relativo al 100%; brillo relativo a la oferta) */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-                  <span style={{ flex: 1, height: 8, borderRadius: 4, background: 'rgb(255 255 255 / 0.1)', overflow: 'hidden' }}>
+                  <span style={{ flex: 1, height: 6, borderRadius: 2, background: '#272730', overflow: 'hidden' }}>
                     <motion.i
-                      style={{ display: 'block', height: '100%', borderRadius: 4, background: syn.color, opacity: 0.55 + 0.45 * (pick / maxPick) }}
+                      style={{ display: 'block', height: '100%', borderRadius: 2, background: syn.color, opacity: 0.55 + 0.45 * (pick / maxPick) }}
                       initial={reduce ? false : { width: 0 }}
                       animate={{ width: `${Math.max(pick, 2)}%` }}
                       transition={reduce ? { duration: 0 } : { duration: 0.6, ease: EASE, delay: 0.15 + o.slot * 0.08 }}
                     />
                   </span>
-                  <span style={{ fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums', minWidth: 48, textAlign: 'right' }}>
+                  <span style={{ fontFamily: 'var(--ax-display)', fontSize: 22, lineHeight: 1, fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 48, textAlign: 'right' }}>
                     {pick > 0 ? `${pick}%` : '<1%'}
                   </span>
                 </div>
-                <div style={{ fontSize: 10, color: '#6D767E', marginTop: 3 }}>
+                <div style={{ fontSize: 11.5, color: '#8c8c98', marginTop: 3 }}>
                   de pickeo de la comunidad{champion ? ` con ${champion}` : ''}
                 </div>
               </div>

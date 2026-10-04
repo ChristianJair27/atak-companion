@@ -80,12 +80,12 @@ export default function DraftAiPanel({ patch, request, enabled = true, onRunesAp
   return (
     <HxPanel corners tone={d && !state.loading ? 'cyan' : undefined}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
-        <span className="hx-label cyan" style={{ fontSize: 11 }}>ATAK Coach · análisis IA del draft</span>
-        {d && <span className="hx-pill" style={{ fontSize: 9 }}>{PROVIDER_LABEL[d.provider]}{d.provider !== 'rules' ? ` · ${d.model}` : ''}</span>}
-        {d && <span className="hx-faint" style={{ fontSize: 10 }}>{(d.tookMs / 1000).toFixed(1)} s</span>}
+        <span className="hx-label head">ATAK Coach · análisis IA del draft</span>
+        {d && <span className="hx-pill">{PROVIDER_LABEL[d.provider]}{d.provider !== 'rules' ? ` · ${d.model}` : ''}</span>}
+        {d && <span className="hx-faint" style={{ fontSize: 12 }}>{(d.tookMs / 1000).toFixed(1)} s</span>}
         <span style={{ flex: 1 }} />
         {request && request.me.championName && (
-          <button type="button" className="hx-btn ghost no-drag" style={{ minHeight: 28, padding: '0 10px', fontSize: 10 }} disabled={state.loading} onClick={() => run(true)}>
+          <button type="button" className="hx-btn ghost no-drag" style={{ minHeight: 30, padding: '0 10px', fontSize: 12 }} disabled={state.loading} onClick={() => run(true)}>
             {state.loading ? 'Analizando…' : d ? 'Reanalizar' : 'Analizar'}
           </button>
         )}
@@ -93,28 +93,28 @@ export default function DraftAiPanel({ patch, request, enabled = true, onRunesAp
 
       <AnimatePresence mode="wait" initial={false}>
         {!request || !request.me.championName ? (
-          <motion.div key="wait" {...swap} className="hx-muted" style={{ fontSize: 12, padding: '6px 0' }}>
+          <motion.div key="wait" {...swap} className="hx-muted" style={{ fontSize: 13, padding: '6px 0' }}>
             Elige tu campeón: en cuanto haya picks enemigos, la IA arma runas, items y plan para esta partida.
           </motion.div>
         ) : enemyCount === 0 && !d ? (
-          <motion.div key="noenemy" {...swap} className="hx-muted" style={{ fontSize: 12, padding: '6px 0' }}>
+          <motion.div key="noenemy" {...swap} className="hx-muted" style={{ fontSize: 13, padding: '6px 0' }}>
             Esperando picks enemigos para personalizar la build…
           </motion.div>
         ) : !d && !state.error ? (
           <motion.div key="loading" {...swap} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
-            <motion.span className="hx-hex cyan" style={{ width: 18, height: 18 }} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}><span className="hx-hex-in" /></motion.span>
-            <span className="hx-label cyan">Leyendo el draft y los datos de OP.GG…</span>
+            <motion.span className="dot" style={{ animation: 'none' }} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }} />
+            <span className="hx-label">Leyendo el draft y los datos de OP.GG…</span>
           </motion.div>
         ) : d ? (
           <motion.div key={state.key} {...swap} style={{ display: 'flex', flexDirection: 'column', gap: 12, opacity: stale || state.loading ? 0.55 : 1 }}>
             {/* Resumen + confianza */}
             <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-              <HxRing pct={Math.round(d.confianza * 100)} size={54} stroke={4} color="var(--hx-cyan)" value={`${Math.round(d.confianza * 100)}%`} label="conf." />
+              <HxRing pct={Math.round(d.confianza * 100)} size={54} stroke={4} color="var(--hx-ink)" value={`${Math.round(d.confianza * 100)}%`} label="conf." />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, lineHeight: 1.45, color: 'var(--hx-ink)' }}>{d.resumen}</div>
+                <div style={{ fontFamily: 'var(--ax-ui)', fontSize: 14, lineHeight: 1.5, color: 'var(--hx-ink)' }}>{d.resumen}</div>
                 {d.amenazas.length > 0 && (
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                    {d.amenazas.map((a) => <span key={a.champion} className="hx-pill miss" title={a.porQue} style={{ textTransform: 'none' }}>⚠ {a.champion}: {a.porQue}</span>)}
+                    {d.amenazas.map((a) => <span key={a.champion} className="hx-pill miss" title={a.porQue} style={{ textTransform: 'none', letterSpacing: '0.02em', fontWeight: 600 }}>{a.champion}: {a.porQue}</span>)}
                   </div>
                 )}
               </div>
@@ -122,7 +122,7 @@ export default function DraftAiPanel({ patch, request, enabled = true, onRunesAp
 
             {/* Plan */}
             {d.plan.length > 0 && (
-              <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, lineHeight: 1.4 }}>
+              <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4, fontFamily: 'var(--ax-ui)', fontSize: 13.5, lineHeight: 1.45 }}>
                 {d.plan.map((p, i) => <li key={i}>{p}</li>)}
               </ol>
             )}
@@ -131,11 +131,11 @@ export default function DraftAiPanel({ patch, request, enabled = true, onRunesAp
               {/* Runas */}
               {d.runas.ids.length === 6 && (
                 <div>
-                  <div className="hx-label gold" style={{ marginBottom: 6 }}>Runas para esta partida <span className="hx-faint" style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>· {d.runas.source}</span></div>
+                  <div className="hx-label head" style={{ marginBottom: 6 }}>Runas para esta partida <span className="hx-faint" style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>· {d.runas.source}</span></div>
                   <HxRuneTree patch={patch} primaryPathId={d.runas.primaryPathId} secondaryPathId={d.runas.secondaryPathId} selected={d.runas.ids} shards={d.runas.shards} compact />
-                  {d.runas.razon && <div className="hx-muted" style={{ fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>{d.runas.razon}</div>}
+                  {d.runas.razon && <div className="hx-muted" style={{ fontSize: 12.5, marginTop: 6, lineHeight: 1.4 }}>{d.runas.razon}</div>}
                   {d.runePage && (
-                    <button type="button" className="hx-btn no-drag" style={{ marginTop: 8, minHeight: 32, fontSize: 11 }} disabled={applying}
+                    <button type="button" className="hx-btn no-drag" style={{ marginTop: 8, minHeight: 34 }} disabled={applying}
                       onClick={async () => {
                         setApplying(true);
                         try { onRunesApplied?.(await window.atak.applyRunes(d.runePage!)); }
@@ -157,7 +157,7 @@ export default function DraftAiPanel({ patch, request, enabled = true, onRunesAp
                   </div>
                 )}
                 <div>
-                  <div className="hx-label gold" style={{ marginBottom: 4 }}>Build para esta partida</div>
+                  <div className="hx-label head" style={{ marginBottom: 4 }}>Build para esta partida</div>
                   <div className="hx-items">
                     {d.items.build.map((id, i) => (
                       <span key={`${id}-${i}`} style={{ display: 'contents' }}>
@@ -166,16 +166,16 @@ export default function DraftAiPanel({ patch, request, enabled = true, onRunesAp
                       </span>
                     ))}
                   </div>
-                  {d.items.razon && <div className="hx-muted" style={{ fontSize: 11, marginTop: 5, lineHeight: 1.4 }}>{d.items.razon}</div>}
+                  {d.items.razon && <div className="hx-muted" style={{ fontSize: 12.5, marginTop: 5, lineHeight: 1.4 }}>{d.items.razon}</div>}
                 </div>
                 {d.items.situacionales.length > 0 && (
                   <div>
                     <div className="hx-label" style={{ marginBottom: 4 }}>Situacionales</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {d.items.situacionales.map((s) => (
-                        <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
+                        <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
                           <HxItem patch={patch} id={s.id} size={24} title={itemName(s.id)} />
-                          <span><b style={{ color: 'var(--hx-gold-bright)', fontWeight: 600 }}>{itemName(s.id)}</b> <span className="hx-muted">· {s.cuando}</span></span>
+                          <span><b style={{ color: 'var(--hx-ink)', fontWeight: 600 }}>{itemName(s.id)}</b> <span className="hx-muted">· {s.cuando}</span></span>
                         </div>
                       ))}
                     </div>
@@ -193,11 +193,11 @@ export default function DraftAiPanel({ patch, request, enabled = true, onRunesAp
             </div>
           </motion.div>
         ) : (
-          <motion.div key="err" {...swap} style={{ fontSize: 12, color: '#ff9aa0' }}>{state.error || 'Sin análisis todavía.'}</motion.div>
+          <motion.div key="err" {...swap} style={{ fontSize: 13, color: 'var(--hx-neg)' }}>{state.error || 'Sin análisis todavía.'}</motion.div>
         )}
       </AnimatePresence>
       {d && (stale || state.loading) && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25, ease: EASE }} className="hx-label cyan" style={{ marginTop: 8 }}>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25, ease: EASE }} className="hx-label" style={{ marginTop: 8 }}>
           {state.loading ? 'Actualizando con el nuevo draft…' : 'El draft cambió: reanalizando en breve…'}
         </motion.div>
       )}

@@ -13,13 +13,13 @@ type Aug = {
 // El tier de OP.GG es RELATIVO por campeón (para ARAM suele usar 3/4/5):
 // el mejor grupo presente se etiqueta S, el siguiente A, etc.
 const TIER_STYLES = [
-  { label: 'S', color: '#ffd25e', bg: 'rgba(255,210,94,0.14)' },
-  { label: 'A', color: '#4dbb63', bg: 'rgba(77,187,99,0.14)' },
+  { label: 'S', color: '#f0d891', bg: 'rgba(240,216,145,0.14)' },
+  { label: 'A', color: '#3ddc97', bg: 'rgba(61,220,151,0.14)' },
   { label: 'B', color: '#6db3ff', bg: 'rgba(109,179,255,0.14)' },
-  { label: 'C', color: '#c9cdd6', bg: 'rgba(201,205,214,0.12)' },
-  { label: 'D', color: '#ff5a64', bg: 'rgba(255,90,100,0.12)' },
+  { label: 'C', color: '#b6b6c0', bg: 'rgba(182,182,192,0.12)' },
+  { label: 'D', color: '#ff6b76', bg: 'rgba(255,107,118,0.12)' },
 ];
-const RARITY_RING = ['rgba(192,199,210,0.55)', 'rgba(255,210,94,0.7)', 'rgba(210,140,255,0.8)']; // plata/oro/prismático
+const RARITY_RING = ['rgba(215,217,222,0.6)', 'rgba(240,216,145,0.8)', 'rgba(210,140,255,0.85)']; // plata/oro/prismático
 const RARITY_NAME = ['Plata', 'Oro', 'Prismático'];
 
 const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -65,33 +65,33 @@ export default function AugmentsView() {
       className="panel"
       style={{
         height: '100vh', display: 'flex', flexDirection: 'column',
-        background: 'rgba(10,10,12,0.94)', border: '1px solid rgba(200,205,214,0.14)',
-        borderRadius: 14, overflow: 'hidden',
+        position: 'relative', background: 'rgba(18,18,22,0.96)', overflow: 'hidden',
       }}
     >
+      <span aria-hidden style={{ position: 'absolute', left: 0, top: 0, zIndex: 1, width: 44, height: 3, background: 'var(--crimson)' }} />
       {/* Header — zona de drag */}
       <div
         className="drag"
         style={{
-          display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
-          borderBottom: '1px solid rgba(200,205,214,0.1)', flexShrink: 0,
-          background: 'linear-gradient(180deg, rgba(225,36,46,0.10), transparent)',
+          display: 'flex', alignItems: 'baseline', gap: 10, padding: '11px 14px 9px',
+          borderBottom: '1px solid var(--ax-line)', flexShrink: 0,
+          background: 'var(--ax-strip)',
           WebkitAppRegion: 'drag',
         } as any}
       >
-        <span className="display" style={{ fontWeight: 800, fontSize: 13, letterSpacing: '0.14em', color: '#fff' }}>
+        <span className="display" style={{ fontWeight: 800, fontStyle: 'italic', fontSize: 20, lineHeight: 1, letterSpacing: '0.02em', color: '#fff' }}>
           AUGMENTS · ARAM
         </span>
         {data?.championName && (
-          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{data.championName}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-soft)' }}>{data.championName}</span>
         )}
-        <span style={{ marginLeft: 'auto', fontSize: 9.5, letterSpacing: '0.1em', color: 'var(--text-faint)' }}>F7</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 600, letterSpacing: '0.1em', color: 'var(--text-dim)' }}>F7</span>
         <button
           className="no-drag"
           onClick={() => window.atak.win('hide')}
           style={{
-            background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer',
-            fontSize: 14, lineHeight: 1, padding: '2px 4px', WebkitAppRegion: 'no-drag',
+            background: 'none', border: 'none', color: 'var(--text-soft)', cursor: 'pointer',
+            fontSize: 14, lineHeight: 1, padding: '4px 6px', alignSelf: 'center', WebkitAppRegion: 'no-drag',
           } as any}
           title="Ocultar (F7 para reabrir)"
         >
@@ -107,9 +107,9 @@ export default function AugmentsView() {
           placeholder="Buscar augment…"
           spellCheck={false}
           style={{
-            flex: 1, height: 28, padding: '0 10px', fontSize: 11.5,
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(200,205,214,0.16)',
-            borderRadius: 8, color: '#fff', outline: 'none',
+            flex: 1, minWidth: 0, height: 32, padding: '0 10px', fontSize: 13.5, fontFamily: 'var(--font-data)',
+            background: 'var(--ax-strip)', border: '1px solid var(--ax-line)',
+            borderRadius: 6, color: '#fff', outline: 'none',
           }}
         />
         {[null, 0, 1, 2].map((r) => (
@@ -118,13 +118,13 @@ export default function AugmentsView() {
             onClick={() => setRarityFilter(r as number | null)}
             title={r == null ? 'Todas las rarezas' : RARITY_NAME[r as number]}
             style={{
-              width: 24, height: 24, borderRadius: 7, cursor: 'pointer', flexShrink: 0,
+              minWidth: 28, height: 28, borderRadius: 4, cursor: 'pointer', flexShrink: 0, padding: '0 6px',
               border: `1.5px solid ${r == null ? 'rgba(255,255,255,0.35)' : RARITY_RING[r as number]}`,
-              background: rarityFilter === r ? 'rgba(255,255,255,0.12)' : 'transparent',
-              color: '#fff', fontSize: 9, fontWeight: 800,
+              background: rarityFilter === r ? 'rgba(255,255,255,0.16)' : 'transparent',
+              color: '#fff', fontFamily: 'var(--font-data)', fontSize: 11, fontWeight: 700,
             }}
           >
-            {r == null ? '✦' : ['P', 'O', 'PR'][r as number]}
+            {r == null ? 'TODO' : ['P', 'O', 'PR'][r as number]}
           </button>
         ))}
       </div>
@@ -132,9 +132,9 @@ export default function AugmentsView() {
       {/* Lista */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 8px 10px' }}>
         {!data ? (
-          <p style={{ padding: 14, fontSize: 12, color: 'var(--text-dim)' }}>Cargando augments…</p>
+          <p style={{ padding: 14, margin: 0, fontSize: 13.5, color: 'var(--text-soft)' }}>Cargando augments…</p>
         ) : !data.ok && !augments.length ? (
-          <p style={{ padding: 14, fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+          <p style={{ padding: 14, margin: 0, fontSize: 13.5, color: 'var(--text-soft)', lineHeight: 1.5 }}>
             Esperando datos del campeón… Este panel muestra tiers y pick rate de augments
             de <b>ARAM</b> para tu campeón (se llena al iniciar la partida).
           </p>
@@ -148,10 +148,10 @@ export default function AugmentsView() {
                   className="eog-row"
                   title={a.desc}
                   style={{
-                    display: 'grid', gridTemplateColumns: '34px 1fr 30px 52px',
-                    gap: 8, alignItems: 'center', padding: '6px 6px',
-                    background: 'rgba(255,255,255,0.028)',
-                    borderLeft: `2px solid ${RARITY_RING[a.rarity] ?? RARITY_RING[0]}`,
+                    display: 'grid', gridTemplateColumns: '34px 1fr 28px 46px',
+                    gap: 8, alignItems: 'center', padding: '6px 8px 6px 6px',
+                    background: 'var(--ax-sub)',
+                    borderLeft: `3px solid ${RARITY_RING[a.rarity] ?? RARITY_RING[0]}`,
                     borderRadius: 6, marginBottom: 4,
                   }}
                 >
@@ -159,40 +159,39 @@ export default function AugmentsView() {
                     <img
                       src={a.icon} alt="" loading="lazy"
                       style={{
-                        width: 30, height: 30, borderRadius: 7, objectFit: 'cover',
-                        boxShadow: `0 0 0 1.5px ${RARITY_RING[a.rarity] ?? RARITY_RING[0]}`,
+                        width: 30, height: 30, borderRadius: 4, objectFit: 'cover',
                         background: 'rgba(0,0,0,0.4)',
                       }}
                       onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
                     />
                   ) : (
-                    <span style={{ width: 30, height: 30, borderRadius: 7, background: 'rgba(255,255,255,0.06)' }} />
+                    <span style={{ width: 30, height: 30, borderRadius: 4, background: 'var(--ax-sunken)' }} />
                   )}
                   <div style={{ minWidth: 0 }}>
                     <div style={{
-                      fontSize: 11.5, fontWeight: 700, color: '#fff',
+                      fontSize: 14, lineHeight: 1.2, fontWeight: 600, color: '#fff',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       {a.name}
                     </div>
                     {/* Barra de popularidad — el ancho ES el pick rate */}
-                    <div style={{ marginTop: 3, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                    <div style={{ marginTop: 4, height: 3, borderRadius: 2, background: 'var(--ax-sunken-2)', overflow: 'hidden' }}>
                       <div style={{
                         width: `${Math.min(100, a.pickRate)}%`, height: '100%',
-                        background: `linear-gradient(90deg, ${t.color}88, ${t.color})`,
+                        background: t.color,
                       }} />
                     </div>
                   </div>
                   <span style={{
-                    justifySelf: 'center', width: 22, height: 22, borderRadius: 6,
+                    justifySelf: 'center', width: 26, height: 26, borderRadius: 4,
                     display: 'grid', placeItems: 'center',
-                    font: '800 11px var(--font-data)', color: t.color, background: t.bg,
+                    font: '700 16px var(--font-display)', color: t.color, background: t.bg,
                     border: `1px solid ${t.color}55`,
                   }}>
                     {t.label}
                   </span>
                   <span style={{
-                    textAlign: 'right', font: '700 11px var(--font-data)', color: 'var(--text-soft)',
+                    textAlign: 'right', font: '700 13.5px var(--font-data)', color: 'var(--text)',
                   }}>
                     {a.pickRate > 0 ? `${a.pickRate}%` : '—'}
                   </span>
@@ -200,7 +199,7 @@ export default function AugmentsView() {
               );
             })}
             {visible.length === 0 && (
-              <p style={{ padding: 12, fontSize: 11.5, color: 'var(--text-faint)' }}>Sin resultados para ese filtro.</p>
+              <p style={{ padding: 12, margin: 0, fontSize: 13, color: 'var(--text-dim)' }}>Sin resultados para ese filtro.</p>
             )}
           </div>
         )}
@@ -208,8 +207,8 @@ export default function AugmentsView() {
 
       {/* Pie */}
       <div style={{
-        padding: '6px 12px', borderTop: '1px solid rgba(200,205,214,0.08)', flexShrink: 0,
-        fontSize: 9, letterSpacing: '0.06em', color: 'var(--text-faint)',
+        padding: '7px 12px', borderTop: '1px solid var(--ax-line)', flexShrink: 0,
+        fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', color: 'var(--text-dim)',
         display: 'flex', justifyContent: 'space-between',
       }}>
         <span>TIER + % PICKEO CON TU CAMPEÓN · OP.GG</span>

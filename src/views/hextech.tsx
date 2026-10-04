@@ -1,6 +1,7 @@
-// src/views/hextech.tsx — componentes de la piel "cliente de League" (ver
-// hextech.css): paneles, hexágonos, slots, segmented, barras/anillos de
-// progreso, árbol de runas completo, grilla de skills e items por etapas.
+// src/views/hextech.tsx — componentes del kit "Arena" del companion (ver
+// hextech.css; conserva los nombres Hx* del kit anterior): paneles, retratos,
+// slots, segmented, barras/anillos de progreso, árbol de runas completo,
+// grilla de skills e items por etapas.
 // Datos de runas/items: DDragon (versión del patch) con caché en memoria.
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -31,7 +32,7 @@ export function HxHex({ src, size = 44, tone, letter, style, className }: {
 }) {
   return (
     <span className={cx('hx-hex', tone, className)} style={{ width: size, height: size, ...style }}>
-      <span className="hx-hex-in" style={{ fontSize: Math.max(9, size * 0.36) }}>
+      <span className="hx-hex-in" style={{ fontSize: Math.max(11, size * 0.42) }}>
         {src ? <img src={src} alt="" draggable={false} /> : (letter || '')}
       </span>
     </span>
@@ -122,24 +123,25 @@ export function HxTabs<T extends string>({ value, options, onChange, className }
 }
 
 // ── Barra y anillo de progreso ───────────────────────────────────────────────
-export function HxBar({ label, value, pct, color = 'var(--hx-gold)', delay = 0, height = 5 }: {
+export function HxBar({ label, value, pct, color = 'var(--hx-ink)', delay = 0, height = 5 }: {
   label: string; value: string; pct: number; color?: string; delay?: number; height?: number;
 }) {
   return (
     <div className="hx-bar">
       <div className="hx-bar-head">
         <span className="hx-label">{label}</span>
-        <span className="hx-mono" style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>{value}</span>
+        <span className="hx-bar-value">{value}</span>
       </div>
       <div className="hx-bar-rail" style={{ height }}>
-        <BarFill pct={pct} delay={delay} style={{ background: color, boxShadow: `0 0 8px ${color}66` }} />
+        <BarFill pct={pct} delay={delay} style={{ background: color }} />
       </div>
     </div>
   );
 }
 
-/** Anillo de progreso SVG: el trazo crece hasta pct (500ms) y sigue al valor. */
-export function HxRing({ pct, size = 56, stroke = 4, color = 'var(--hx-gold)', track = 'rgb(255 255 255 / 0.08)', value, label, children }: {
+/** Anillo de progreso SVG: el trazo crece hasta pct (500ms) y sigue al valor.
+ *  La cifra va dentro y la etiqueta debajo (legible a 11px). */
+export function HxRing({ pct, size = 56, stroke = 4, color = 'var(--hx-ink)', track = 'var(--ax-sunken-2)', value, label, children }: {
   pct: number; size?: number; stroke?: number; color?: string; track?: string; value?: ReactNode; label?: string; children?: ReactNode;
 }) {
   const reduce = useReducedMotion();
@@ -147,6 +149,7 @@ export function HxRing({ pct, size = 56, stroke = 4, color = 'var(--hx-gold)', t
   const c = 2 * Math.PI * r;
   const p = Math.max(0, Math.min(100, pct));
   return (
+    <div className="hx-ringbox">
     <div className="hx-ring" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={stroke} />
@@ -159,13 +162,10 @@ export function HxRing({ pct, size = 56, stroke = 4, color = 'var(--hx-gold)', t
         />
       </svg>
       <div style={{ position: 'relative', textAlign: 'center', lineHeight: 1 }}>
-        {children ?? (
-          <>
-            <div className="hx-ring-v" style={{ fontSize: Math.max(10, size * 0.26) }}>{value}</div>
-            {label && <div className="hx-ring-k">{label}</div>}
-          </>
-        )}
+        {children ?? <div className="hx-ring-v" style={{ fontSize: Math.max(13, size * 0.32) }}>{value}</div>}
       </div>
+    </div>
+    {!children && label && <div className="hx-ring-k">{label}</div>}
     </div>
   );
 }
@@ -283,9 +283,9 @@ export function HxRuneTree({ patch, primaryPathId, secondaryPathId, selected, sh
   );
   return (
     <div className="hx-runes" style={compact ? { gap: 10 } : undefined}>
-      <Path p={primary} isPrimary tone="var(--hx-gold-bright)" />
+      <Path p={primary} isPrimary tone="var(--hx-ink)" />
       <span className="hx-runes-sep" />
-      <Path p={secondary} isPrimary={false} tone="var(--hx-cyan)" />
+      <Path p={secondary} isPrimary={false} tone="var(--hx-ink-2)" />
     </div>
   );
 }
@@ -320,7 +320,7 @@ export function HxItem({ patch, id, size = 32, core, owned, title }: { patch: Pa
     </span>
   );
 }
-export const HxArrow = ({ color = 'var(--hx-gold)' }: { color?: string }) => (
+export const HxArrow = ({ color = 'var(--hx-muted)' }: { color?: string }) => (
   <svg className="hx-arrow" viewBox="0 0 10 10" aria-hidden><path d="M2 5 H7 M5 2.5 L7.5 5 L5 7.5" stroke={color} strokeWidth="1.3" fill="none" /></svg>
 );
 export function HxItemStage({ patch, label, ids, size = 32, arrows, owned = [], core }: {
@@ -373,7 +373,7 @@ export function HxFullBuild({ patch, builds, options, owned = [], size = 32, com
           {list.map((b, i) => (
             <button key={i} type="button" role="tab" aria-selected={i === idx} className={i === idx ? 'is-active' : ''} onClick={() => setIdx(i)}
               title={`${b.label}${b.pickRate != null ? ` · ${b.pickRate}% de pick` : ''}${b.winRate != null ? ` · ${b.winRate}% WR` : ''}`}
-              style={{ minHeight: 26, fontSize: 10, padding: '0 8px', letterSpacing: '0.08em' }}>
+              style={{ minHeight: 26, fontSize: 11.5, padding: '0 8px' }}>
               {b.label}{!compact && b.winRate != null ? <span className="hx-mono" style={{ marginLeft: 6, color: b.winRate >= 50 ? 'var(--hx-green)' : 'var(--hx-crimson)' }}>{b.winRate}%</span> : null}
             </button>
           ))}
@@ -388,7 +388,7 @@ export function HxFullBuild({ patch, builds, options, owned = [], size = 32, com
         ))}
       </motion.div>
       {(cur.pickRate != null || cur.play) && (
-        <div className="hx-faint" style={{ fontSize: 10, letterSpacing: '0.08em' }}>
+        <div className="hx-muted" style={{ fontSize: 12 }}>
           {cur.pickRate != null ? `${cur.pickRate}% la juegan` : ''}{cur.winRate != null ? ` · ${cur.winRate}% WR` : ''}{cur.play ? ` · ${cur.play.toLocaleString()} partidas` : ''}
         </div>
       )}
@@ -397,11 +397,11 @@ export function HxFullBuild({ patch, builds, options, owned = [], size = 32, com
           <div className="hx-label">Alternativas por slot</div>
           {slots.map(([label, opts]) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <span className="hx-label" style={{ width: 42, color: 'var(--hx-gold)' }}>{label}</span>
+              <span className="hx-label" style={{ width: 48 }}>{label}</span>
               {opts.slice(0, 4).map((o) => (
                 <span key={o.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} title={`${o.name}${o.winRate != null ? ` · ${o.winRate}% WR` : ''}`}>
                   <HxItem patch={patch} id={o.id} size={22} owned={own.has(o.id)} />
-                  <span className="hx-mono hx-muted" style={{ fontSize: 9.5 }}>{o.pickRate != null ? `${o.pickRate}%` : ''}</span>
+                  <span className="hx-mono hx-muted" style={{ fontSize: 11.5 }}>{o.pickRate != null ? `${o.pickRate}%` : ''}</span>
                 </span>
               ))}
             </div>

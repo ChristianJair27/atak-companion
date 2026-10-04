@@ -246,6 +246,18 @@ async function opggRoster() {
   onChampSelect,
   onChampionBuild: (fn: (p: any) => void) => { buildFn = fn; return () => { buildFn = null; }; },
   onAugOffers,
+  // Panel de augments (F7): lista simulada con tiers relativos y rarezas.
+  aramAugments: async () => ({
+    ok: true, championName: 'Katarina',
+    augments: [
+      { id: 1349, name: 'Ultimate Awakening', desc: '', tier: 3, pickRate: 28, performance: 72.3, rarity: 2, icon: '' },
+      { id: 1103, name: 'Bread And Butter', desc: '', tier: 3, pickRate: 37, performance: 70.7, rarity: 0, icon: '' },
+      { id: 1201, name: 'Jeweled Gauntlet', desc: '', tier: 4, pickRate: 19, performance: 66.1, rarity: 2, icon: '' },
+      { id: 1088, name: 'Executioner', desc: '', tier: 4, pickRate: 12, performance: 63.0, rarity: 1, icon: '' },
+      { id: 1045, name: 'Infernal Conduit', desc: '', tier: 5, pickRate: 6, performance: 56.7, rarity: 1, icon: '' },
+      { id: 1012, name: 'Tank Engine', desc: '', tier: 6, pickRate: 2, performance: 48.9, rarity: 0, icon: '' },
+    ],
+  }),
   opggPickSuggestions: async () => [
     { name: 'Ahri', winRate: 51, pickRate: 9, tier: 1, reason: 'Cubre AP · Meta MIDDLE · T1', matchupWinRate: null },
     { name: 'Twisted Fate', winRate: 51, pickRate: 4, tier: 1, reason: '' },

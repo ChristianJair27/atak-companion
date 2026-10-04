@@ -1,4 +1,4 @@
-/* champselect-motion.css — movimiento de ChampSelectView / DraftView.
+/* champselect-motion.css — movimiento y piezas de ChampSelectView / DraftView.
    Solo opacity / transform / width. Easing único cubic-bezier(0.22, 1, 0.36, 1). */
 
 /* Botones y slots pulsables: press 0.96 en 150ms + foco visible por teclado. */
@@ -8,24 +8,24 @@
 .cs-press:active:not(:disabled) { transform: scale(0.96); }
 .cs-press:focus-visible,
 .cs-focus:focus-visible {
-  outline: 2px solid #c8aa6e;
+  outline: 2px solid var(--ax-red-hi);
   outline-offset: 2px;
 }
 
-/* .btn ya trae su propia transición (incluye transform): solo añadimos press y foco. */
 .btn.cs-btn:active:not(:disabled) { transform: scale(0.96); }
 .btn.cs-btn:focus-visible {
-  outline: 2px solid #c8aa6e;
+  outline: 2px solid var(--ax-red-hi);
   outline-offset: 2px;
 }
 
-/* Slot al que le toca: aro que respira por opacidad (sin tocar box-shadow). */
+/* Slot al que le toca: aro claro que respira por opacidad. */
 .cs-acting-ring {
   position: absolute;
   inset: -1px;
   pointer-events: none;
-  border: 1px solid rgba(10, 200, 185, 0.9);
-  background: rgba(10, 200, 185, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.07);
   animation: cs-acting-pulse 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
 }
 @keyframes cs-acting-pulse {
@@ -33,21 +33,50 @@
   to { opacity: 1; }
 }
 
+/* Fases del draft + reloj */
+.cs-phase { position: relative; padding-bottom: 4px; font-family: var(--hx-display); font-size: 15px; font-weight: 600; letter-spacing: 0.08em; color: var(--hx-faint); }
+.cs-phase.done { color: var(--hx-muted); }
+.cs-phase.on { color: #fff; font-weight: 700; }
+.cs-phase-line { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--hx-crimson); }
+.cs-phase-gap { width: 20px; height: 1px; background: var(--hx-line); }
+.cs-timer {
+  display: inline-flex; min-width: 64px; justify-content: center; padding: 0 10px;
+  font-family: var(--hx-display); font-weight: 800; font-style: italic; font-size: 24px; line-height: 28px;
+  color: #fff; background: var(--hx-crimson); border-radius: var(--ax-r-chip);
+}
+.cs-timer-rail { width: 88px; height: 3px; border-radius: 2px; background: var(--ax-sunken-2); overflow: hidden; }
+
 /* Barra del timer: sigue al valor de forma continua (1 tick = 1s), nunca reinicia. */
 .cs-timer-fill {
   height: 100%;
+  background: var(--hx-crimson);
   transition: width 1s linear;
 }
 
+/* Marca del lado (azul / rojo) sobre cada columna */
+.cs-side { display: flex; align-items: center; gap: 8px; }
+.cs-side.right { justify-content: flex-end; }
+.cs-side i { width: 14px; height: 3px; flex: none; background: var(--hx-blue); }
+.cs-side.right i { background: var(--hx-crimson); }
+
+/* Título del campeón elegido */
+.cs-hero-title { text-transform: uppercase; line-height: 0.98; text-shadow: 0 4px 24px rgba(0, 0, 0, 0.8); }
+.cs-chapter { position: absolute; left: 0; right: 0; top: 40%; z-index: 6; pointer-events: none; text-align: center; font-size: 64px; text-transform: uppercase; text-shadow: 0 6px 30px rgba(0, 0, 0, 0.9); }
+
+/* Nota de un consejo */
+.cs-note { font-family: var(--ax-ui); font-size: 13px; line-height: 1.45; color: var(--hx-ink); border-left: 2px solid var(--hx-line-strong); padding-left: 10px; }
+.cs-note.hot { border-left-color: var(--hx-crimson); }
+.cs-note b { margin-right: 6px; color: var(--hx-crimson-hi); font-family: var(--hx-data); letter-spacing: 0.04em; }
+
 /* Grid de campeones del simulador: hover/press por CSS. */
 .cs-grid-cell { transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1), opacity 150ms cubic-bezier(0.22, 1, 0.36, 1); }
-.cs-grid-cell:not(.taken):hover { transform: scale(1.12); }
+.cs-grid-cell:not(.taken):hover { transform: scale(1.1); }
 .cs-grid-cell:not(.taken):active { transform: scale(0.96); }
 
 /* Chips compactos dentro de los slots del draft (rango · maestría · meta). */
-.cs-slot-pills .hx-pill { font-size: 9px; padding: 1px 5px; letter-spacing: 0.06em; }
+.cs-slot-pills .hx-pill { font-size: 10.5px; min-height: 17px; padding: 0 5px; letter-spacing: 0.04em; }
 
-/* Timer bajo 10 s: el brillo late más rápido (solo opacidad del halo). */
+/* Timer bajo 10 s: late más rápido (solo opacidad). */
 .cs-timer-urgent { animation: cs-urgent 0.5s ease-in-out infinite alternate; }
 @keyframes cs-urgent {
   from { opacity: 0.6; }

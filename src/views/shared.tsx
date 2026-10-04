@@ -291,9 +291,9 @@ export function ItemIcon(props: {
       title={id > 0 ? String(id) : ''}
       style={{
         width: size, height: size, flex: 'none', display: 'inline-block',
-        borderRadius: 5, overflow: 'hidden',
-        border: `1px solid ${trinket ? 'rgba(200,170,110,.35)' : 'rgba(200,205,214,.18)'}`,
-        background: 'rgba(255,255,255,.04)', opacity: empty || !id ? 0.15 : 1,
+        borderRadius: 4, overflow: 'hidden',
+        border: `1px solid ${trinket ? 'rgba(255,255,255,.2)' : 'rgba(255,255,255,.09)'}`,
+        background: 'var(--ax-sunken)', opacity: empty || !id ? 0.3 : 1,
       }}
     >
       {url ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : null}
@@ -311,7 +311,7 @@ export function SpellIcon(props: { patch: PatchInfo | null; spell: number | stri
       title={String(spell || '')}
       style={{
         width: size, height: size, flex: 'none', borderRadius: 4, overflow: 'hidden',
-        border: '1px solid rgba(200,205,214,.22)', background: '#12131a',
+        border: '1px solid rgba(255,255,255,.09)', background: 'var(--ax-sunken)',
         display: 'inline-grid', placeItems: 'center',
       }}
     >
@@ -323,7 +323,7 @@ export function SpellIcon(props: { patch: PatchInfo | null; spell: number | stri
           onError={() => setBroken(true)}
         />
       ) : (
-        <span style={{ fontSize: Math.max(7, size * 0.38), fontWeight: 800, color: 'var(--text-dim)' }}>
+        <span style={{ fontSize: Math.max(9, size * 0.42), fontWeight: 700, color: 'var(--text-dim)' }}>
           {String(spell || '?').replace(/Summoner/i, '').slice(0, 2).toUpperCase() || '?'}
         </span>
       )}
@@ -368,7 +368,7 @@ export function RankBadge(props: {
   }, [tier, emblemUrl]);
 
   if (!tier) {
-    return <span style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600 }}>UNRANKED</span>;
+    return <span style={{ fontSize: 11.5, letterSpacing: '0.1em', color: 'var(--text-dim)', fontWeight: 600 }}>UNRANKED</span>;
   }
   const color = TIER_COLOR[String(tier).toUpperCase()] || 'var(--text-soft)';
   const divLabel =
@@ -395,23 +395,23 @@ export function RankBadge(props: {
         />
       ) : (
         <span style={{
-          width: size, height: size, borderRadius: '50%', flex: 'none',
-          background: `radial-gradient(circle at 35% 30%, ${color}55, #0a0a0c)`,
+          width: size, height: size, borderRadius: 4, flex: 'none',
+          background: 'var(--ax-sunken)',
           border: `1px solid ${color}`, display: 'grid', placeItems: 'center',
-          fontSize: Math.max(8, size * 0.28), fontWeight: 800, color,
+          fontFamily: 'var(--ax-display)', fontSize: Math.max(11, size * 0.5), fontWeight: 700, color,
         }}>
           {String(tier).slice(0, 1)}
         </span>
       )}
       <span style={{ minWidth: 0 }}>
         <span style={{
-          display: 'block', fontSize: Math.max(11, size * 0.38), fontWeight: 800,
+          display: 'block', fontSize: Math.max(12, size * 0.44), lineHeight: 1.15, fontWeight: 700,
           color, textTransform: 'uppercase', letterSpacing: '0.04em',
         }}>
           {tier}{divLabel}
         </span>
         {lp != null && (
-          <span style={{ fontSize: Math.max(10, size * 0.32), color: 'var(--text-dim)', fontWeight: 600 }}>
+          <span style={{ display: 'block', fontSize: Math.max(11.5, size * 0.38), lineHeight: 1.15, color: 'var(--text-dim)', fontWeight: 600 }}>
             {lp} LP
           </span>
         )}
@@ -463,7 +463,7 @@ export function RuneIcon(props: {
         title={title}
         style={{
           width: dim, height: dim, borderRadius: keystone ? '50%' : 4,
-          background: 'rgba(255,255,255,.05)',
+          background: 'var(--ax-sunken)',
           border: `1px solid ${hot ? 'var(--crimson)' : 'rgba(255,255,255,.1)'}`,
           display: 'inline-block', flex: 'none',
         }}
@@ -480,9 +480,9 @@ export function RuneIcon(props: {
       style={{
         width: dim, height: dim, flex: 'none', objectFit: 'cover',
         borderRadius: keystone ? '50%' : 4,
-        border: `1px solid ${hot || keystone ? 'rgba(225,36,46,.55)' : 'rgba(200,205,214,.18)'}`,
+        border: `1px solid ${hot || keystone ? 'var(--crimson)' : 'rgba(255,255,255,.14)'}`,
         background: '#0a0a0c',
-        boxShadow: keystone ? '0 0 12px rgba(225,36,46,.45)' : undefined,
+        boxShadow: keystone ? '0 0 0 3px rgba(232,50,60,.22)' : undefined,
       }}
       onError={() => setSrc(null)}
     />
@@ -555,7 +555,7 @@ export const IconFist = ({ size = 12, color = '#e8a84a' }: { size?: number; colo
 );
 
 // ── Iconos SVG de objetivos ──────────────────────────────────────────────────
-export const DragonSvg = ({ size = 12, color = '#E1242E' }: { size?: number; color?: string }) => (
+export const DragonSvg = ({ size = 12, color = '#e8323c' }: { size?: number; color?: string }) => (
   <svg width={size} height={size} viewBox="0 0 12 12">
     <path d="M6 0 L11 6 L6 12 L1 6 Z" fill={color} />
   </svg>
@@ -586,7 +586,7 @@ export function ObjChip(props: {
   const gone = nextAt == null;
   const live = alive && !gone;
   const cls = `obj-chip skew${live ? ' live' : ''}${gone ? ' off' : ''}`;
-  const iconColor = live ? '#E1242E' : '#8b8f9a';
+  const iconColor = live ? '#fff' : '#8c8c98';
   const Icon = icon === 'dragon' ? DragonSvg : icon === 'herald' ? HeraldSvg : BaronSvg;
   return (
     <div className={cls} style={{ flex: 1 }}>

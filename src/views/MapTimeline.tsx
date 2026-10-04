@@ -20,12 +20,12 @@ const ANCHORS: Record<string, { x: number; y: number }> = {
 };
 
 const EVENT_META: Record<string, { icon: string; label: string; color: string }> = {
-  ChampionKill: { icon: '⚔', label: 'Asesinato', color: '#E1242E' },
-  DragonKill: { icon: '◆', label: 'Dragón', color: '#4fd1ff' },
+  ChampionKill: { icon: '⚔', label: 'Asesinato', color: '#e8323c' },
+  DragonKill: { icon: '◆', label: 'Dragón', color: '#6db3ff' },
   BaronKill: { icon: '●', label: 'Barón', color: '#a78bfa' },
   HeraldKill: { icon: '◎', label: 'Heraldo', color: '#c8aa6e' },
-  TurretKilled: { icon: '▲', label: 'Torre', color: '#9ba0ab' },
-  InhibKilled: { icon: '■', label: 'Inhibidor', color: '#ff9aa0' },
+  TurretKilled: { icon: '▲', label: 'Torre', color: '#b6b6c0' },
+  InhibKilled: { icon: '■', label: 'Inhibidor', color: '#ff6b76' },
 };
 
 function eventPos(e: any): { x: number; y: number } | null {
@@ -85,7 +85,7 @@ export default function MapTimeline(props: {
 
   if (!all.length) {
     return (
-      <div style={{ padding: 16, fontSize: 11, color: 'var(--text-faint)', letterSpacing: '0.08em' }}>
+      <div style={{ padding: 16, fontSize: 13, color: 'var(--text-dim)' }}>
         Sin eventos con posición. En partidas live los kills/objetivos se marcan en el mapa;
         para la repetición Match-V5 completa usa «Análisis completo» en ATAK.GG.
       </div>
@@ -99,7 +99,7 @@ export default function MapTimeline(props: {
         <div
           style={{
             position: 'relative', width: '100%', aspectRatio: '1 / 1', borderRadius: 12,
-            overflow: 'hidden', background: '#0c1220', border: '1px solid rgba(200,205,214,.16)',
+            overflow: 'hidden', background: '#0e0e11', border: '1px solid rgba(255,255,255,.09)',
           }}
         >
           <img
@@ -146,8 +146,8 @@ export default function MapTimeline(props: {
             className="mono"
             style={{
               position: 'absolute', left: 8, bottom: 8, zIndex: 4,
-              background: 'rgba(10,10,12,.75)', border: '1px solid rgba(200,205,214,.2)',
-              padding: '2px 8px', fontSize: 11, color: '#fff', borderRadius: 4,
+              background: 'rgba(10,10,12,.85)', border: '1px solid rgba(255,255,255,.14)',
+              padding: '2px 8px', fontSize: 13, fontWeight: 700, color: '#fff', borderRadius: 4,
             }}
           >
             {fmtClock(Math.round(tNow))} / {fmtClock(Math.round(maxT))}
@@ -161,7 +161,7 @@ export default function MapTimeline(props: {
           max={1000}
           value={Math.round(cursor * 1000)}
           onChange={(ev) => setCursor(Number(ev.target.value) / 1000)}
-          style={{ width: '100%', accentColor: '#E1242E' }}
+          style={{ width: '100%', accentColor: '#e8323c' }}
         />
 
         {/* Gráfico kills por tramo */}
@@ -174,7 +174,7 @@ export default function MapTimeline(props: {
                 style={{
                   flex: 1,
                   height: `${Math.max(8, v * 100)}%`,
-                  background: `linear-gradient(180deg, #E1242E, #7d1017)`,
+                  background: '#e8323c',
                   opacity: 0.45 + v * 0.55,
                   borderRadius: '2px 2px 0 0',
                 }}
@@ -193,12 +193,12 @@ export default function MapTimeline(props: {
             <div
               key={i}
               style={{
-                display: 'flex', gap: 8, alignItems: 'center', fontSize: 12,
-                padding: '6px 8px', background: 'rgba(255,255,255,.03)',
+                display: 'flex', gap: 8, alignItems: 'center', fontSize: 13.5,
+                padding: '6px 8px', background: 'var(--ax-sub)', borderRadius: 4,
                 borderLeft: `2px solid ${meta.color}`,
               }}
             >
-              <span className="mono" style={{ width: 40, color: 'var(--text-faint)', flex: 'none' }}>
+              <span className="mono" style={{ width: 40, color: 'var(--text-dim)', flex: 'none' }}>
                 {fmtClock(Math.round(e.t))}
               </span>
               <span style={{
@@ -216,7 +216,7 @@ export default function MapTimeline(props: {
           );
         })}
         {!feed.length && (
-          <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>Mueve el scrubber para ver eventos.</div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-dim)' }}>Mueve el scrubber para ver eventos.</div>
         )}
       </div>
     </div>

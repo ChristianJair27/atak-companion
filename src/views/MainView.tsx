@@ -2,11 +2,12 @@
 // INICIO (estado) · DRAFT (herramienta de drafteo) · ATAK.GG (frontend embebido
 // en <webview>) · CASTER (transmisión LQC simplificada) · AJUSTES.
 // El riel navega entre pantallas SIN abrir ventanas nuevas.
-// Piel: "hextech / cliente de League" (hextech.css + hextech.tsx) con la misma
-// información y el mismo cableado de datos/IPC que antes.
+// Piel: kit "Arena" (hextech.css + hextech.tsx), el mismo lenguaje del sitio
+// ATAK.GG, con la misma información y el mismo cableado de datos/IPC.
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import logo from '../assets/atak-logo.png';
+import pkg from '../../package.json';
 import { fmtClock, phaseEs, useLive, useStatus } from './shared';
 import DraftView from './DraftView';
 import { EASE, Rise, Stagger, Ticker, rise, staggerParent, swap } from '../motion';
@@ -37,11 +38,11 @@ const slideCard = (fromX: number): Variants => ({
   show: { opacity: 1, x: 0, transition: { duration: 0.5, ease: EASE } },
 });
 const HERO = slideCard(-28);
-/** Rótulo de sección: tracking abierto + blur que se limpia (preset `title` del champ select). */
+/** Rótulo de sección: entra deslizando desde la izquierda (solo transform + opacity). */
 const TITLE = {
-  initial: { opacity: 0, letterSpacing: '0.42em', filter: 'blur(8px)' },
-  animate: { opacity: 1, letterSpacing: '0.12em', filter: 'blur(0px)', transition: { duration: 0.6, ease: EASE } },
-  exit: { opacity: 0, letterSpacing: '0.2em', filter: 'blur(4px)', transition: { duration: 0.18, ease: EASE } },
+  initial: { opacity: 0, x: -18 },
+  animate: { opacity: 1, x: 0, transition: { duration: 0.45, ease: EASE } },
+  exit: { opacity: 0, x: 8, transition: { duration: 0.18, ease: EASE } },
 };
 const GRID_STAGGER = staggerParent(0.05, 0.1);
 const TITLE_IN = { duration: 0.3, ease: EASE };
@@ -65,12 +66,12 @@ function Crossfade({ id, children, style, block }: { id: string; children: React
   );
 }
 
-/** Rótulo de paso del formulario de caster: numeral carmesí + label dorado. */
+/** Rótulo de paso del formulario de caster: numeral crimson + título. */
 function StepLabel({ n, children }: { n: string; children: ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+    <div className="hm-steprow">
       <span className="hm-step">{n}</span>
-      <span className="hx-label gold" style={{ fontSize: 10.5 }}>{children}</span>
+      <span className="hx-label">{children}</span>
       <span className="hx-hr" style={{ flex: 1, display: 'block' }} />
     </div>
   );
@@ -230,7 +231,7 @@ export default function MainView() {
   );
 
   return (
-    <div className="hx hx-stage hm" style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative', display: 'flex', flexDirection: 'column', boxShadow: 'inset 0 0 0 1px var(--hx-gold-faint)' }}>
+    <div className="hx hx-stage hm" style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative', display: 'flex', flexDirection: 'column', boxShadow: 'inset 0 0 0 1px var(--hx-line)' }}>
       {/* Viñeta estática sobre el escenario (debajo del contenido, como en champ select) */}
       <div className="hx-vignette" style={{ zIndex: 0 }} />
 
@@ -243,9 +244,9 @@ export default function MainView() {
           transition={TITLE_IN}
         >
           <img src={logo} alt="" style={{ height: 24 }} draggable={false} />
-          <span className="hx-wordmark hx-chrome" style={{ fontSize: 14 }}>ATAK.GG</span>
-          <span className="hx-label" style={{ fontSize: 9.5, letterSpacing: '0.12em', textTransform: 'none', fontWeight: 500 }}>
-            v0.1.0 · F9 HUD · F8/Ctrl+A players · Ctrl+Shift+S score
+          <span className="hx-wordmark">ATAK<em>.GG</em></span>
+          <span className="hx-label" style={{ letterSpacing: '0.04em', textTransform: 'none', fontWeight: 500 }}>
+            v{pkg.version} · F9 HUD · F8/Ctrl+A players · Ctrl+Shift+S score
           </span>
         </motion.div>
         <motion.div
@@ -263,7 +264,7 @@ export default function MainView() {
           >
             Jugadores · F8
           </button>
-          <span style={{ width: 1, height: 18, background: 'var(--hx-gold-faint)', margin: '0 4px' }} />
+          <span style={{ width: 1, height: 18, background: 'var(--hx-line)', margin: '0 4px' }} />
           <button type="button" className="hx-icon-btn" onClick={() => window.atak.win('minimize')} aria-label="Minimizar">
             <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 5 H9" stroke="currentColor" strokeWidth="1.2" /></svg>
           </button>
@@ -297,14 +298,14 @@ export default function MainView() {
           animate={{ opacity: atakOn ? 1 : 0 }}
           transition={atakOn ? { duration: 0.25, ease: EASE } : { duration: 0 }}
         >
-          <div className="no-drag" style={{ height: 40, flex: 'none', display: 'flex', alignItems: 'center', gap: 6, padding: '0 10px', borderBottom: '1px solid var(--hx-gold-faint)', background: 'rgb(7 10 18 / 0.75)' }}>
+          <div className="no-drag hm-webbar">
             <button type="button" className="hx-btn ghost sm" aria-label="Atrás" onClick={() => { try { webRef.current?.goBack?.(); } catch { /* */ } }}>←</button>
             <button type="button" className="hx-btn ghost sm" onClick={() => goAtak('/')}>Inicio</button>
             <button type="button" className="hx-btn ghost sm" onClick={() => goAtak(profilePath)}>
               {myRiotId ? 'Mi perfil' : 'Stats'}
             </button>
             <button type="button" className="hx-btn ghost sm" onClick={() => goAtak('/tournaments')}>Torneos</button>
-            <span className="hx-label" style={{ marginLeft: 'auto', fontSize: 9.5, textTransform: 'none', fontWeight: 500, color: 'var(--hx-faint)' }}>atakgg · siempre la última versión desplegada</span>
+            <span className="hx-label" style={{ marginLeft: 'auto', letterSpacing: '0.04em', textTransform: 'none', fontWeight: 500 }}>atakgg · siempre la última versión desplegada</span>
           </div>
           <webview ref={webRef} src={atakUrl} style={{ flex: 1, minHeight: 0 }} />
         </motion.div>
@@ -319,18 +320,14 @@ export default function MainView() {
             exit="exit"
             style={{ flex: 1, padding: '18px 24px 22px', display: 'flex', flexDirection: 'column', gap: 14, overflow: 'auto', minWidth: 0 }}
           >
-            {/* Cabecera de la pestaña: rótulo cromado con entrada `title` + hairline dorado */}
-            <motion.div variants={rise} style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 'none', minHeight: 30 }}>
-              <span style={{ width: 8, height: 8, flex: 'none', transform: 'rotate(45deg)', background: 'var(--hx-cyan)', boxShadow: '0 0 8px var(--hx-cyan)' }} />
-              <motion.span
-                {...TITLE}
-                className="hx-chrome"
-                style={{ fontWeight: 700, fontSize: 22, textTransform: 'uppercase', lineHeight: 1, textShadow: '0 4px 20px rgba(0,0,0,.8)', whiteSpace: 'nowrap' }}
-              >
+            {/* Cabecera de la pestaña: raya crimson + título en itálica + hairline */}
+            <motion.div variants={rise} style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 'none', minHeight: 32 }}>
+              <span className="hm-kicker" />
+              <motion.span {...TITLE} className="hx-chrome hm-title">
                 {TAB_TITLE[tab]}
               </motion.span>
-              <span className="hx-label gold" style={{ fontSize: 9.5, marginTop: 2 }}>{TAB_NUM[tab]} · Companion</span>
-              <span className="hx-hr" style={{ flex: 1, display: 'block', background: 'linear-gradient(90deg, var(--hx-gold-dim), transparent)' }} />
+              <span className="hx-label" style={{ marginTop: 4 }}>{TAB_NUM[tab]} · Companion</span>
+              <span className="hx-hr" style={{ flex: 1, display: 'block' }} />
             </motion.div>
 
             {/* ── INICIO ── */}
@@ -338,33 +335,32 @@ export default function MainView() {
               <>
                 {/* Hero: invocador + estado + accesos rápidos */}
                 <motion.div variants={HERO} style={{ flex: 'none' }}>
-                  <HxPanel corners strong cut={14} className="hm-card" inner={{ padding: '18px 22px', background: 'linear-gradient(135deg, rgb(10 200 185 / 0.06), rgb(16 21 34 / 0.9) 40%, rgb(16 21 34 / 0.9) 70%, rgb(200 170 110 / 0.06))' }}>
+                  <HxPanel corners strong className="hm-card" inner={{ padding: '20px 22px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-                      <HxHex size={64} tone={status?.summoner ? 'cyan' : 'dim'} letter={initial} />
+                      <HxHex size={68} tone={status?.summoner ? undefined : 'dim'} letter={initial} />
                       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {/* La ficha se cruza al llegar el invocador (y si se desvincula) */}
                         <Crossfade block id={status?.summoner ? `summoner:${initial}` : 'none'}>
                           {status?.summoner ? (
                             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
                               <span
-                                className="hx-chrome hm-link"
+                                className="hx-chrome hm-link hm-hero-name"
                                 title="Ver mi perfil en ATAK.GG"
                                 onClick={() => { setTab('atak'); goAtak(profilePath); }}
-                                style={{ fontSize: 24, fontWeight: 700, letterSpacing: '0.04em', lineHeight: 1.1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                               >
                                 {status.summoner.gameName}
                               </span>
-                              {status.summoner.tagLine && <span className="hx-goldtext" style={{ fontSize: 13, fontWeight: 700 }}>#{status.summoner.tagLine}</span>}
+                              {status.summoner.tagLine && <span className="hm-hero-tag">#{status.summoner.tagLine}</span>}
                             </div>
                           ) : (
                             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
-                              <span className="hx-chrome" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '0.04em', lineHeight: 1.1 }}>Sin invocador</span>
-                              <span className="hx-muted" style={{ fontSize: 12 }}>abre el cliente de League para vincular tu cuenta.</span>
+                              <span className="hx-chrome hm-hero-name" style={{ fontSize: 28 }}>Sin invocador</span>
+                              <span className="hx-muted" style={{ fontSize: 13.5 }}>abre el cliente de League para vincular tu cuenta.</span>
                             </div>
                           )}
                         </Crossfade>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          {status?.region && <span className="hx-pill gold">{status.region}</span>}
+                          {status?.region && <span className="hx-pill">{status.region}</span>}
                           <Crossfade id={connKey}>
                             <span className={`hx-pill${status?.lcuConnected ? ' ok' : ' miss'}`}>
                               <span className={`hm-diamond ${status?.lcuConnected ? 'on' : 'off'}`} style={{ width: 6, height: 6 }} />
@@ -372,16 +368,16 @@ export default function MainView() {
                             </span>
                           </Crossfade>
                           <Crossfade id={phaseKey}>
-                            <span className="hx-pill" style={status?.inGame ? { color: '#bff5ef', borderColor: 'rgb(10 200 185 / 0.5)', background: 'rgb(10 200 185 / 0.1)' } : undefined}>
+                            <span className={`hx-pill${status?.inGame ? ' live' : ''}`}>
                               {phaseTxt}
                             </span>
                           </Crossfade>
-                          {status?.summoner && <span className="hx-muted" style={{ fontSize: 11 }}>Cuenta vinculada al companion</span>}
+                          {status?.summoner && <span className="hx-muted" style={{ fontSize: 12.5 }}>Cuenta vinculada al companion</span>}
                         </div>
                       </div>
 
                       {/* Accesos rápidos */}
-                      <span style={{ width: 1, alignSelf: 'stretch', background: 'linear-gradient(180deg, transparent, var(--hx-gold-dim), transparent)' }} />
+                      <span className="hm-sep" />
                       <motion.div variants={GRID_STAGGER} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, flex: 'none' }}>
                         {([
                           ['Herramienta de draft', 'primary', () => setTab('draft')],
@@ -390,7 +386,7 @@ export default function MainView() {
                           ['Modo caster', 'ghost', () => setTab('caster')],
                         ] as const).map(([label, kind, fn]) => (
                           <motion.div key={label} variants={rise} style={{ display: 'grid' }}>
-                            <button type="button" className={`hx-btn ${kind}`} style={{ minHeight: 36, fontSize: 11, padding: '0 16px', whiteSpace: 'nowrap' }} onClick={fn}>{label}</button>
+                            <button type="button" className={`hx-btn ${kind}`} onClick={fn}>{label}</button>
                           </motion.div>
                         ))}
                       </motion.div>
@@ -402,19 +398,19 @@ export default function MainView() {
                   {/* Estado de conexión */}
                   <motion.div variants={CARD} style={{ flex: 1, minWidth: 0, display: 'flex' }}>
                     <HxPanel corners className="hm-card" style={{ flex: 1 }} inner={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <div className="hx-label gold">Estado de conexión</div>
+                      <div className="hx-label head">Estado de conexión</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span className={`hm-diamond ${status?.lcuConnected ? 'on' : 'off'}`} />
-                        <Crossfade id={connKey} style={{ fontSize: 14 }}>
+                        <Crossfade id={connKey} style={{ fontSize: 15 }}>
                           {status?.lcuConnected ? 'Cliente de League detectado' : 'Esperando al cliente de League…'}
                         </Crossfade>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span className={`hm-diamond${status?.inGame ? ' on' : ''}`} />
                         {/* key = fase (no el reloj): el tick del reloj no re-dispara el cruce */}
-                        <Crossfade id={phaseKey} style={{ fontSize: 14 }}>
+                        <Crossfade id={phaseKey} style={{ fontSize: 15 }}>
                           {status?.inGame ? (
-                            <>En partida{gameTime != null && <> · <span className="hx-mono" style={{ fontSize: 12.5, color: 'var(--hx-cyan)' }}>{fmtClock(gameTime)}</span></>}</>
+                            <>En partida{gameTime != null && <> · <span className="hx-mono" style={{ fontWeight: 700, color: 'var(--hx-ink)' }}>{fmtClock(gameTime)}</span></>}</>
                           ) : (
                             phaseEs(status?.phase || 'None')
                           )}
@@ -445,18 +441,18 @@ export default function MainView() {
                   {/* Overlays y atajos (mismo toggle que en Ajustes) */}
                   <motion.div variants={CARD} style={{ flex: 1.15, minWidth: 0, display: 'flex' }}>
                     <HxPanel corners className="hm-card" style={{ flex: 1 }} inner={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <div className="hx-label gold">Overlays y atajos</div>
+                      <div className="hx-label head">Overlays y atajos</div>
                       <motion.div variants={GRID_STAGGER} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                         {OVERLAYS.map(([kind, label, keys]) => (
                           <motion.div key={kind} variants={rise} style={{ display: 'grid' }}>
                             <button
                               type="button"
                               className="hx-btn ghost row"
-                              style={{ minHeight: 34, fontSize: 11, padding: '0 12px' }}
+                              style={{ padding: '0 12px' }}
                               onClick={() => { void window.atak.toggleOverlay(kind); }}
                             >
                               <span>{label}</span>
-                              <span className="hx-mono" style={{ fontSize: 9.5, letterSpacing: 0, textTransform: 'none', color: 'var(--hx-gold)' }}>{keys}</span>
+                              <span className="keys">{keys}</span>
                             </button>
                           </motion.div>
                         ))}
@@ -473,7 +469,7 @@ export default function MainView() {
             {/* ── CASTER (simplificado) ── */}
             {tab === 'caster' && (
               <motion.div variants={CARD_STAGGER} style={{ flex: 'none' }}>
-                <HxPanel corners strong cut={16} inner={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 16, background: 'linear-gradient(135deg, rgb(225 36 46 / 0.09), rgb(16 21 34 / 0.9) 45%)' }}>
+                <HxPanel corners strong inner={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 18 }}>
                   {/* Paso 1: canal + token */}
                   <Rise>
                     <StepLabel n="01">Canal y token</StepLabel>
@@ -489,7 +485,6 @@ export default function MainView() {
                       <button
                         type="button"
                         className="hx-btn ghost"
-                        style={{ minHeight: 34, fontSize: 11 }}
                         disabled={transmitting}
                         onClick={() => setCaster((c) => ({ ...c, channel: 'lqc-2026' }))}
                         title="Rellena el canal oficial de la LQC"
@@ -538,10 +533,10 @@ export default function MainView() {
                         <span className="hm-live" style={{ animationPlayState: transmitting ? 'running' : 'paused' }} />
                         <Crossfade id={transmitting ? 'stop' : 'start'}>{transmitting ? 'Detener transmisión' : 'Iniciar transmisión'}</Crossfade>
                       </button>
-                      <button type="button" className="hx-btn" style={{ fontSize: 11 }} onClick={() => copy('overlay', overlayUrl)} title={overlayUrl}>
+                      <button type="button" className="hx-btn" onClick={() => copy('overlay', overlayUrl)} title={overlayUrl}>
                         <Crossfade id={copied === 'overlay' ? 'ok' : 'idle'}>{copied === 'overlay' ? '✓ Copiado' : 'Copiar link overlay (OBS)'}</Crossfade>
                       </button>
-                      <button type="button" className="hx-btn" style={{ fontSize: 11 }} onClick={() => copy('board', boardUrl)} title={boardUrl}>
+                      <button type="button" className="hx-btn" onClick={() => copy('board', boardUrl)} title={boardUrl}>
                         <Crossfade id={copied === 'board' ? 'ok' : 'idle'}>{copied === 'board' ? '✓ Copiado' : 'Copiar link tablero'}</Crossfade>
                       </button>
                       <div className="no-drag" style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }} title="Muestra la barra de transmisión (1920×112) en esta PC">
@@ -553,8 +548,8 @@ export default function MainView() {
                         />
                       </div>
                     </div>
-                    <div className="hx-muted" style={{ marginTop: 12, fontSize: 11, lineHeight: 1.6 }}>
-                      <b className="hx-goldtext" style={{ fontSize: 11, letterSpacing: '0.06em' }}>Guía en 3 pasos:</b> ① espectea (o juega) la partida en el cliente de LoL desde ESTA PC ·
+                    <div className="hm-help" style={{ marginTop: 12 }}>
+                      <b>Guía en 3 pasos:</b> ① espectea (o juega) la partida en el cliente de LoL desde ESTA PC ·
                       ② INICIAR TRANSMISIÓN (debajo debe decir OK 200) · ③ en OBS: Fuente de navegador → pegar el
                       LINK OVERLAY, 1920×1080. El tablero completo es para ver en cualquier navegador.
                       Al haber dragón/barón, el overlay lanza la animación solo.
@@ -563,31 +558,31 @@ export default function MainView() {
 
                   {/* Registro de envío */}
                   <Rise>
-                    <HxPanel cut={6} strong inner={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 24 }}>
+                    <div className="hm-bug">
                       <div>
-                        <div className="hx-mono" style={{ fontWeight: 700, fontSize: 16, color: '#fff' }}><Ticker value={Number(feed?.pushed ?? 0) || 0} /></div>
-                        <div className="hx-label" style={{ fontSize: 9 }}>Snapshots</div>
+                        <div className="hm-bug-value"><Ticker value={Number(feed?.pushed ?? 0) || 0} /></div>
+                        <div className="hx-label">Snapshots</div>
                       </div>
-                      <span style={{ width: 1, height: 28, background: 'var(--hx-gold-faint)' }} />
+                      <span className="hm-bug-sep" />
                       <div>
                         <div style={{ minHeight: 20, display: 'flex', alignItems: 'center' }}>
                           <Crossfade id={transmitting ? lastTxt : 'INACTIVO'}>
                             <span className={`hx-pill${transmitting ? lastTone : ''}`}>{transmitting ? lastTxt : 'Inactivo'}</span>
                           </Crossfade>
                         </div>
-                        <div className="hx-label" style={{ fontSize: 9, marginTop: 2 }}>Estado</div>
+                        <div className="hx-label" style={{ marginTop: 2 }}>Estado</div>
                       </div>
-                      <span style={{ width: 1, height: 28, background: 'var(--hx-gold-faint)' }} />
+                      <span className="hm-bug-sep" />
                       <div>
-                        <div className="hx-mono" style={{ fontWeight: 700, fontSize: 16, color: 'var(--hx-gold-bright)', fontVariantNumeric: 'tabular-nums' }}>{transmitting ? lastAgo : '—'}</div>
-                        <div className="hx-label" style={{ fontSize: 9 }}>Último envío</div>
+                        <div className="hm-bug-value">{transmitting ? lastAgo : '—'}</div>
+                        <div className="hx-label">Último envío</div>
                       </div>
                       <AnimatePresence initial={false}>
                         {transmitting && last?.error ? (
                           <motion.div
                             key="feed-error"
                             className="hx-mono"
-                            style={{ fontSize: 11, color: '#ff9aa0' }}
+                            style={{ fontSize: 13, color: 'var(--hx-neg)' }}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1, transition: { duration: 0.25, ease: EASE } }}
                             exit={{ opacity: 0, transition: { duration: 0.15, ease: EASE } }}
@@ -596,7 +591,7 @@ export default function MainView() {
                           </motion.div>
                         ) : null}
                       </AnimatePresence>
-                    </HxPanel>
+                    </div>
                   </Rise>
                 </HxPanel>
               </motion.div>
@@ -607,18 +602,18 @@ export default function MainView() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 640, flex: 'none' }}>
                 <motion.div variants={CARD}>
                   <HxPanel corners className="hm-card" inner={{ padding: '14px 18px' }}>
-                    <div className="hx-label gold" style={{ marginBottom: 10 }}>Abrir / cerrar overlays</div>
+                    <div className="hx-label head" style={{ marginBottom: 10 }}>Abrir / cerrar overlays</div>
                     <motion.div variants={GRID_STAGGER} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       {OVERLAYS.map(([kind, label, keys]) => (
                         <motion.div key={kind} variants={rise} style={{ display: 'grid' }}>
                           <button
                             type="button"
                             className="hx-btn ghost row"
-                            style={{ minHeight: 36, fontSize: 11, padding: '0 12px' }}
+                            style={{ padding: '0 12px' }}
                             onClick={() => { void window.atak.toggleOverlay(kind); }}
                           >
                             <span>{label}</span>
-                            <span className="hx-mono" style={{ fontSize: 9.5, letterSpacing: 0, textTransform: 'none', color: 'var(--hx-gold)' }}>{keys}</span>
+                            <span className="keys">{keys}</span>
                           </button>
                         </motion.div>
                       ))}
@@ -626,11 +621,11 @@ export default function MainView() {
                   </HxPanel>
                 </motion.div>
 
-                <Rise className="hx-muted" style={{ fontSize: 10.5, lineHeight: 1.7 }}>
+                <Rise className="hm-help">
                   Los hotkeys se re-registran solos al entrar a partida. Si LoL está en
                   «pantalla completa exclusiva», Windows bloquea hotkeys globales — usa
-                  <b style={{ color: 'var(--hx-gold-bright)' }}> sin bordes (borderless)</b> en los ajustes de video de LoL.
-                  <br />ATAK Companion v0.1.0 · beta — reporta bugs al Discord de la LQC.
+                  <b> sin bordes (borderless)</b> en los ajustes de video de LoL.
+                  <br />ATAK Companion v{pkg.version} · beta — reporta bugs al Discord de la LQC.
                 </Rise>
               </div>
             )}

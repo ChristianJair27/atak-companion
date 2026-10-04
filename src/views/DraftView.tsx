@@ -57,8 +57,8 @@ const centerCol = {
   show: { opacity: 1, scale: 1, transition: { duration: 0.6, ease: EASE } },
 };
 const title = {
-  initial: { opacity: 0, letterSpacing: '0.42em', filter: 'blur(8px)' },
-  animate: { opacity: 1, letterSpacing: '0.12em', filter: 'blur(0px)', transition: { duration: 0.6, ease: EASE } },
+  initial: { opacity: 0, x: -16 },
+  animate: { opacity: 1, x: 0, transition: { duration: 0.4, ease: EASE } },
 };
 
 /** Composición de un lado a partir de los tags DDragon de sus picks. */
@@ -354,7 +354,7 @@ export default function DraftView() {
     return (
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: side === 'red' ? 'flex-end' : 'flex-start' }}>
         {(['AD', 'AP', 'TANK', 'ENGAGE'] as const).map((k) => (
-          <span key={k} className={`hx-pill${c[k] > 0 ? ' ok' : ' miss'}`} style={{ fontSize: 9, padding: '1px 6px' }}>
+          <span key={k} className={`hx-pill${c[k] > 0 ? ' ok' : ' miss'}`}>
             {k}<span className="n">{c[k]}</span>
           </span>
         ))}
@@ -408,9 +408,9 @@ export default function DraftView() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 30 }}>
           {/* Rótulo del slot activo: re-entra con el preset `title` en cada cambio (sin exit: nunca se queda colgado si el usuario encadena clics). */}
           <motion.div key={chapter} initial={title.initial} animate={title.animate} className="hx-chrome dv-chapter">{chapter}</motion.div>
-          <span className="hx-faint" style={{ fontSize: 10, letterSpacing: '0.06em' }}>clic en un slot lo activa · clic derecho lo limpia</span>
+          <span className="hx-faint" style={{ fontSize: 12 }}>clic en un slot lo activa · clic derecho lo limpia</span>
           <span style={{ flex: 1 }} />
-          <button type="button" className="hx-btn ghost no-drag" style={{ minHeight: 28, padding: '0 10px', fontSize: 10 }} onClick={resetAll}>Reiniciar</button>
+          <button type="button" className="hx-btn ghost no-drag" style={{ minHeight: 30, padding: '0 10px', fontSize: 12 }} onClick={resetAll}>Reiniciar</button>
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -466,7 +466,7 @@ export default function DraftView() {
             <Reveal on={dock === 'sugs'}>
               <HxPanel corners inner={{ padding: '10px 12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-                  <span className="hx-label gold">Sugerencias para el azul</span>
+                  <span className="hx-label head">Sugerencias para el azul</span>
                   <HxSegmented<Position>
                     className="dv-seg no-drag"
                     value={myPos}
@@ -476,7 +476,7 @@ export default function DraftView() {
                   <button
                     type="button"
                     className="hx-btn primary no-drag"
-                    style={{ minHeight: 30, padding: '0 14px', fontSize: 11, marginLeft: 'auto' }}
+                    style={{ minHeight: 32, padding: '0 14px', fontSize: 12, marginLeft: 'auto' }}
                     onClick={() => void suggest()}
                     disabled={sugsLoading}
                   >
@@ -505,14 +505,14 @@ export default function DraftView() {
                         >
                           <HxHex src={champFaceUrl(patch, s.name)} size={44} tone={s.matchupWinRate != null ? 'cyan' : undefined} letter={s.name.charAt(0)} />
                           <div className="nm">{s.name}</div>
-                          <div className="hx-mono" style={{ fontSize: 9, color: s.matchupWinRate != null ? '#8fd99e' : 'var(--hx-muted)' }}>
+                          <div className="hx-mono" style={{ fontSize: 11.5, fontWeight: 600, color: s.matchupWinRate != null ? 'var(--hx-green)' : 'var(--hx-muted)' }}>
                             {s.matchupWinRate != null ? `${s.matchupWinRate}% vs ${s.vsRival}` : s.winRate != null ? `${s.winRate}% WR` : '—'}
                           </div>
                         </motion.div>
                       ))}
                     </motion.div>
                   ) : (
-                    <motion.div key="hint" {...swap} className="hx-muted" style={{ fontSize: 11 }}>
+                    <motion.div key="hint" {...swap} className="hx-muted" style={{ fontSize: 12.5 }}>
                       Llena bans y picks del rojo, elige tu línea y presiona SUGERIR PICK — puntúa el meta contra el draft enemigo real (OP.GG).
                     </motion.div>
                   )}
@@ -530,15 +530,15 @@ export default function DraftView() {
               />
               <AnimatePresence>
                 {runesMsg && (
-                  <motion.div key={runesMsg.text} {...swap} className={`hx-label ${runesMsg.ok ? 'cyan' : 'red'}`} style={{ marginTop: 6, textTransform: 'none', letterSpacing: '0.06em' }}>
+                  <motion.div key={runesMsg.text} {...swap} className={`hx-label ${runesMsg.ok ? 'ok' : 'red'}`} style={{ marginTop: 6, textTransform: 'none', letterSpacing: '0.03em' }}>
                     {runesMsg.text}
                   </motion.div>
                 )}
               </AnimatePresence>
               {aiRequest && (
-                <div className="hx-faint" style={{ fontSize: 10, marginTop: 6, letterSpacing: '0.04em' }}>
-                  Tú: <b style={{ color: 'var(--hx-gold-bright)', fontWeight: 600 }}>{aiRequest.me.championName}</b> ({POS_LABEL[myPos]})
-                  {rivalName ? <> · rival posicional: <b style={{ color: '#ff9aa0', fontWeight: 600 }}>{rivalName}</b></> : ' · sin rival en el slot espejo'}
+                <div className="hx-muted" style={{ fontSize: 12, marginTop: 6 }}>
+                  Tú: <b style={{ color: 'var(--hx-ink)', fontWeight: 600 }}>{aiRequest.me.championName}</b> ({POS_LABEL[myPos]})
+                  {rivalName ? <> · rival posicional: <b style={{ color: 'var(--hx-neg)', fontWeight: 600 }}>{rivalName}</b></> : ' · sin rival en el slot espejo'}
                   {' · '}marca otro pick con <b style={{ fontWeight: 600 }}>TÚ</b> para cambiarlo.
                 </div>
               )}

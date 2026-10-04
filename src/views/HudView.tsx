@@ -1,7 +1,7 @@
 // src/views/HudView.tsx — HUD in-game compacto (ventana 320×420, F9).
 // Overlay siempre visible encima del juego: poca información para no estorbar,
 // y los números clave como gráficos de progreso (anillos CS/MIN · KP · VISIÓN,
-// barra de oro hacia el siguiente item core de OP.GG). Piel hextech.
+// barra de oro hacia el siguiente item core de OP.GG). Kit Arena.
 // Listas de equipos y grilla AD/AP/ARM/RM viven en el scoreboard (Ctrl+Shift+S).
 import { useEffect, useState, type ReactNode } from 'react';
 import { BarFill, Blip, Rise, Stagger, Ticker } from '../motion';
@@ -114,8 +114,8 @@ export default function HudView() {
   const csMin = min > 0 ? cs / min : 0;
   const visMin = min > 0 ? vision / min : 0;
   const kda = me.deaths > 0 ? (me.kills + me.assists) / me.deaths : me.kills + me.assists;
-  // Antes del minuto y medio no hay CS que juzgar: dorado neutro.
-  const csColor = gameTime < 90 ? 'var(--hx-gold)' : csMin >= 7 ? 'var(--hx-green)' : csMin >= 5 ? 'var(--hx-gold)' : 'var(--hx-crimson)';
+  // Antes del minuto y medio no hay CS que juzgar: neutro. Luego verde / neutro / rojo.
+  const csColor = gameTime < 90 ? 'var(--hx-ink-2)' : csMin >= 7 ? 'var(--hx-green)' : csMin >= 5 ? 'var(--hx-ink-2)' : 'var(--hx-neg)';
 
   const cst = me.championStats;
   const hpPct = cst?.maxHp > 0 ? Math.max(0, Math.min(100, (cst.hp / cst.maxHp) * 100)) : 0;
@@ -143,13 +143,7 @@ export default function HudView() {
             </span>
           </div>
           <div className="hx-bar-rail" style={{ height: 6 }}>
-            <BarFill
-              pct={nextPct}
-              style={{
-                background: ready ? 'linear-gradient(90deg, #2f8f3f, var(--hx-green))' : 'linear-gradient(90deg, #8a6d3b, var(--hx-gold) 70%, var(--hx-gold-bright))',
-                boxShadow: ready ? '0 0 8px rgb(77 187 99 / 0.5)' : '0 0 8px rgb(200 170 110 / 0.4)',
-              }}
-            />
+            <BarFill pct={nextPct} className={`fill${ready ? ' ok' : ''}`} />
           </div>
           <div className="hud-next-foot hx-mono"><Ticker value={gold} /> / {next.cost}</div>
         </div>
@@ -161,10 +155,10 @@ export default function HudView() {
     <div className="hx hud-root">
       <Stagger>
         <HxPanel corners inner={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 9 }}>
-          {/* Cabecera: retrato hex + nivel · nombre · reloj · HP / recurso */}
+          {/* Cabecera: retrato + nivel · nombre · reloj · HP / recurso */}
           <Rise className="hud-head">
             <div className="hud-face">
-              <HxHex src={champFaceUrl(patch, me.championName)} size={44} tone="cyan" letter={(me.championName || '?').charAt(0)} />
+              <HxHex src={champFaceUrl(patch, me.championName)} size={46} letter={(me.championName || '?').charAt(0)} />
               <span className="hud-lvl"><Blip value={me.level} /></span>
             </div>
             <div className="hud-id">
@@ -197,16 +191,16 @@ export default function HudView() {
 
           {/* Anillos de progreso */}
           <Rise className="hud-rings">
-            <HxRing pct={(csMin / 8) * 100} size={58} color={csColor} value={<Ticker value={csMin} format={fmt1} />} label="CS/MIN" />
-            <HxRing pct={kp} size={58} color="var(--hx-cyan)" value={<><Ticker value={kp} />%</>} label="KP" />
-            <HxRing pct={(visMin / 1.5) * 100} size={58} color="var(--hx-blue)" value={<Ticker value={vision} />} label="VISIÓN" />
+            <HxRing pct={(csMin / 8) * 100} size={60} color={csColor} value={<Ticker value={csMin} format={fmt1} />} label="CS/MIN" />
+            <HxRing pct={kp} size={60} color="var(--hx-ink)" value={<><Ticker value={kp} />%</>} label="KP" />
+            <HxRing pct={(visMin / 1.5) * 100} size={60} color="var(--hx-blue)" value={<Ticker value={vision} />} label="VISIÓN" />
           </Rise>
 
           <hr className="hx-hr" />
 
           {/* Siguiente item core (OP.GG) y oro que falta */}
           <Rise className="hud-next">
-            <div className="hx-label gold">SIGUIENTE ITEM</div>
+            <div className="hx-label head">SIGUIENTE ITEM</div>
             {nextBody}
           </Rise>
 

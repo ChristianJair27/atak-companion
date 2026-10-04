@@ -230,8 +230,11 @@ Env útiles:
 ## Convenciones
 
 - Español en UI del companion; comentarios técnicos en español/inglés mixto como el repo.
-- Design system: crimson `#E1242E`, plata, negro `#0A0A0C` — `src/styles.css` y `design/ATAK-Screens.html`.
-- Display font: **Friz Quadrata** (LoL) con fallback Cinzel.
+- Design system: **"Arena"**, el mismo del sitio (`E:/ATAKGG/aka.gg/design-system/atak-gg/MASTER.md`). Tokens `--ax-*` en `src/styles.css`
+  (crimson `#e8323c` como único acento, oro solo para honores, verde/rojo solo V/D, paneles opacos con hairline, radios 10/6/4).
+- Tipografía: **Barlow Condensed** (títulos y cifras, 800 itálica en títulos) · **Barlow Semi Condensed** (datos y etiquetas) · **Barlow** (texto corrido),
+  cargadas por `<link>` en `index.html` y `preview/index.html`. Etiquetas ≥ 11px; nada de 9–10px.
+- `design/ATAK-Screens.html` y `public/fonts` (Friz Quadrata) son del diseño anterior: ya no se usan.
 - No reintroducir Overwolf SDK.
 - No inventar field names de LCU: siempre multi-key `st()`.
 - Preferir CommunityDragon/DDragon públicos sobre assets locales pesados.
@@ -239,9 +242,10 @@ Env útiles:
 
 ---
 
-## Octubre 2026 — piel hextech, motion y ATAK Coach (IA)
+## Octubre 2026 — kit de diseño (ahora "Arena"), motion y ATAK Coach (IA)
 
-- **Kit de diseño** `src/views/hextech.css` + `hextech.tsx` (paneles con esquinas cortadas y hairline dorado, `HxSlot` con splash de fondo, `HxHex`, `HxRuneTree` completo vía DDragon, `HxSkillGrid`, `HxFullBuild` con variantes, `HxRing`, `useItemData`). Lo usan champ select, HUD (320×420), panel F8, home y draft tool. El post-partida usa su propia piel (`post.css`, tokens Outfit/cyan).
+- **Kit de diseño** `src/views/hextech.css` + `hextech.tsx`: conserva los nombres `hx-*` / `Hx*`, pero desde el rediseño "Arena" (oct-2026) pinta el lenguaje del sitio: panel opaco con radio y tramo crimson (`corners`), `HxSlot` con carril lateral de color + splash de fondo, `HxHex` (retrato cuadrado con radio), `HxSegmented` con activo en blanco, chips `hx-pill` (`ok` / `miss` / `gold` / `live` / `you`), rótulos `hx-label head`, `HxRuneTree`, `HxSkillGrid`, `HxFullBuild`, `HxRing` (etiqueta debajo), `useItemData`. Lo usan champ select, HUD (320×420), panel F8, home y draft tool. El post-partida usa `post.css` con los mismos tokens `--ax-*`.
+- Código de color fijo: crimson = acento / lado rojo / en vivo · azul `--ax-blue` = lado azul · blanco = seleccionado, "TÚ" y a quién le toca · oro = honores (nota S, recomendado, maestría).
 - **Motion** común en `src/motion.tsx` (solo opacity/transform/width, easing `0.22,1,0.36,1`); `MotionConfig reducedMotion="user"` en `App.tsx`. Todas las ventanas llevan `backgroundThrottling: false` (si no, Chromium congela rAF con la ventana tapada y las animaciones se quedan a medias).
 - **ATAK Coach** (`electron/services/draft-ai.ts`, IPC `draft-analyze`, UI `src/views/DraftAiPanel.tsx`): build personalizada por draft. Proveedores: Claude (`ANTHROPIC_API_KEY`) → Ollama local `atak-coach` (`ollama/Modelfile`, base qwen3:8b; `npm run ai:setup`) → reglas + OP.GG. La IA elige solo entre ids del catálogo (OP.GG + situacionales) y se valida contra DDragon (página de runas estructuralmente válida, 1 bota, ≤3 piezas distintas de la build base, hechizos vistos por OP.GG). Prueba sin Electron: `npx tsx scripts/draft-ai-smoke.ts`.
 - **OP.GG**: `getChampionBuild` ahora trae `full_builds` (6 items: botas + core + 4º + 5º), `item_options` por slot y `spell_ids`; cuando el `core_items` del MCP es un core de nicho (pick < 30 %) el core se deriva de `last_items` (los legendarios más comprados).
