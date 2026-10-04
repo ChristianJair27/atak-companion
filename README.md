@@ -4,6 +4,17 @@ Companion de escritorio para **League of Legends** — parte del ecosistema [ATA
 
 > ⚠️ **Beta abierta.** Lo estamos compartiendo para recibir feedback — issues y sugerencias son bienvenidos.
 
+## ⬇️ Descargar e instalar (Windows)
+
+**[Descargar ATAK-Companion-Setup.exe](https://github.com/ChristianJair27/atak-companion/releases/latest/download/ATAK-Companion-Setup.exe)** — siempre la última versión.
+
+1. Ejecuta el instalador. Windows SmartScreen puede avisar porque la app aún no está firmada: **Más información → Ejecutar de todas formas**.
+2. Abre **ATAK Companion** (queda en el menú Inicio y el escritorio) y después abre League of Legends: se conecta solo al cliente.
+3. Entra a una partida: el champ select, el HUD y el post-partida aparecen automáticamente.
+
+Atajos: **F9** HUD · **F8 / Ctrl+A** panel de jugadores · **Ctrl+Shift+S** scoreboard · **F7** augments (ARAM/Arena).
+La app se actualiza sola cuando publicamos una versión nueva. ¿Algo falla? Abre un [issue](https://github.com/ChristianJair27/atak-companion/issues).
+
 ## Qué hace
 
 ### 🗡️ Champ Select inteligente
