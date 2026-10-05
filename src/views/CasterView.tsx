@@ -41,7 +41,7 @@ const LQC: Theme = {
   // itálica: el navegador la inclina, como el logo de la liga.
   font: "'Orbitron', var(--ax-display)", italic: true, scale: 0.7,
   data: "'JetBrains Mono', var(--font-data)",
-  panelImg: `linear-gradient(rgba(1,8,22,.46), rgba(1,8,22,.46)), url(${lqcBg}) center / cover no-repeat, #020b1c`,
+  panelImg: `linear-gradient(rgba(1,8,22,.6), rgba(1,8,22,.6)), url(${lqcBg}) center / cover no-repeat, #020b1c`,
   glow: '0 0 18px rgba(63,151,255,.7)', stroke: '0.03em currentColor',
 };
 

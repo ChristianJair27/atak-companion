@@ -222,15 +222,19 @@ export function computeObjectives(state: GameState): ObjectiveTimers {
     }
   }
 
+  // Timers de la temporada 2026: dragón 5:00 (+5:00), alma al 4.º y Anciano 6:00
+  // después; Heraldo 15:00–19:45 (una vez); Barón 20:00 (+6:00).
   const t = state.gameTime;
-  const dragonNext = lastDragon < 0 ? 300 : lastDragon + 300;
+  const elemental = dragonsTaken.filter((d) => d.type !== 'Elder');
+  const soul = (['ORDER', 'CHAOS'] as const).some((side) => elemental.filter((d) => d.team === side).length >= 4);
+  const dragonNext = lastDragon < 0 ? 300 : lastDragon + (soul ? 360 : 300);
   const baronBase = lastBaron < 0 ? 1200 : lastBaron + 360;
 
   return {
     dragon: { nextAt: dragonNext, alive: t >= dragonNext, taken: dragonsTaken },
-    herald: heraldTaken || t >= 1200
+    herald: heraldTaken || t >= 1185
       ? { nextAt: null, alive: false, taken: heraldTaken }
-      : { nextAt: 480, alive: t >= 480, taken: false },
+      : { nextAt: 900, alive: t >= 900, taken: false },
     baron: { nextAt: t >= 1140 ? baronBase : null, alive: t >= baronBase && t >= 1200, takenCount: barons },
   };
 }

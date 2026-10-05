@@ -15,6 +15,7 @@ import { uIOhook, UiohookKey } from 'uiohook-napi';
 import electronUpdater from 'electron-updater';
 const { autoUpdater } = electronUpdater;
 import path from 'node:path';
+import { writeFile } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { LcuService } from './services/lcu.js';
 import { LiveClientService, computeObjectives } from './services/live-client.js';
@@ -758,8 +759,24 @@ live.on('state', (state) => {
   const objectives = computeObjectives(state);
   // events se ocultan del broadcast liviano; se reinyectan al EOG desde lastLiveEvents
   broadcast('live', { state: { ...state, raw: undefined, events: undefined }, objectives });
-  if (feed.active) void feed.push(state);
+  if (feed.active) {
+    void feed.push(state);
+    dumpRawForDebug(state);
+  }
 });
+
+// Modo caster: cada 30 s guarda el allgamedata crudo en la carpeta de datos de
+// la app (debug-allgamedata.json). Sirve para ver qué campos trae Riot en cada
+// parche (misiones de rol, cargas…) sin tener que abrir el juego otra vez.
+// Solo en disco local: no se envía a ningún sitio.
+let lastRawDump = 0;
+function dumpRawForDebug(state: any) {
+  if (!state?.raw || Date.now() - lastRawDump < 30_000) return;
+  lastRawDump = Date.now();
+  try {
+    writeFile(path.join(app.getPath('userData'), 'debug-allgamedata.json'), JSON.stringify(state.raw), () => { /* mejor esfuerzo */ });
+  } catch { /* sin disco: da igual */ }
+}
 
 // ── IPC de la UI ─────────────────────────────────────────────────────────────
 ipcMain.handle('status', () => ({

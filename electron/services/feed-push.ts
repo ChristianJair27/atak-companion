@@ -18,6 +18,28 @@ export interface FeedConfig {
   accent?: string;
 }
 
+// Eventos que el overlay necesita ENTEROS (objetivos, estructuras): de las kills
+// basta con las últimas. Con un corte parejo, una partida larga perdía los
+// primeros dragones y torres.
+const KEY_EVENTS = new Set([
+  'GameStart', 'MinionsSpawning', 'FirstBrick', 'TurretKilled', 'InhibKilled', 'InhibRespawned',
+  'DragonKill', 'HeraldKill', 'BaronKill', 'HordeKill', 'FirstBlood', 'Ace', 'GameEnd',
+]);
+
+/** Eventos a enviar + si el historial arranca en el inicio de la partida. */
+export function selectFeedEvents(state: GameState): { events: any[]; eventsComplete: boolean } {
+  const all: any[] = Array.isArray(state.events) ? state.events : [];
+  const key = all.filter((e) => KEY_EVENTS.has(e?.EventName));
+  const rest = all.filter((e) => !KEY_EVENTS.has(e?.EventName)).slice(-70);
+  const events = [...key, ...rest].sort((a, b) => (a?.EventID ?? 0) - (b?.EventID ?? 0)).slice(-300);
+  // Si el espectador entró a medias, el Live Client no trae lo anterior: se
+  // nota porque los jugadores suman más kills que eventos de kill hay.
+  const kills = state.players.reduce((s, p) => s + (p.kills || 0), 0);
+  const killEvents = all.filter((e) => e?.EventName === 'ChampionKill').length;
+  const eventsComplete = all.some((e) => e?.EventName === 'GameStart') && killEvents >= kills - 1;
+  return { events, eventsComplete };
+}
+
 export class FeedPusher {
   config: FeedConfig | null = null;
   lastStatus: { at: number; code: number | null; error?: string } | null = null;
@@ -33,6 +55,7 @@ export class FeedPusher {
   async push(state: GameState): Promise<void> {
     const cfg = this.config;
     if (!cfg) return;
+    const { events, eventsComplete } = selectFeedEvents(state);
     const snapshot = {
       gameTime: state.gameTime,
       gameMode: state.gameMode,
@@ -51,8 +74,12 @@ export class FeedPusher {
         respawnTimer: p.respawnTimer,
         position: p.position,
         items: p.items.map((id) => ({ itemID: id })),
+        // Hechizos (token "SummonerFlash") y runa clave (id) para la tabla del overlay.
+        spells: [p.spell1, p.spell2].map((s) => (typeof s === 'string' && s.startsWith('Summoner') ? s : '')),
+        keystone: p.keystoneId || 0,
       })),
-      events: state.events.slice(-80),
+      events,
+      eventsComplete,
     };
 
     await new Promise<void>((resolve) => {
