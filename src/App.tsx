@@ -14,6 +14,11 @@ import CasterView from './views/CasterView';
 import AugmentsView from './views/AugmentsView';
 import AugBadgesView from './views/AugBadgesView';
 
+export type UpdateStatus = {
+  state: 'idle' | 'checking' | 'none' | 'downloading' | 'ready' | 'error' | 'dev';
+  version?: string; percent?: number; error?: string; checkedAt?: number; current?: string;
+};
+
 declare global {
   interface Window {
     atak: {
@@ -80,6 +85,10 @@ declare global {
       }>>;
       togglePlayers: () => Promise<{ ok: boolean; open: boolean }>;
       toggleOverlay: (kind: 'hud' | 'scoreboard' | 'players' | 'champselect') => Promise<{ ok: boolean }>;
+      updateState: () => Promise<UpdateStatus>;
+      updateCheck: () => Promise<UpdateStatus>;
+      updateInstall: () => Promise<{ ok: boolean }>;
+      onUpdateStatus: (fn: (s: UpdateStatus) => void) => () => void;
       showOverlay: (kind: 'hud' | 'champselect') => Promise<{ ok: boolean }>;
       openExternal: (url: string) => void;
       win: (a: 'minimize' | 'close' | 'hide') => void;

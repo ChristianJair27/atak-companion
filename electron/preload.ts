@@ -25,6 +25,11 @@ contextBridge.exposeInMainWorld('atak', {
   onSummoner: on('summoner'),
   onLcuConnected: on('lcu-connected'),
   onLcuDisconnected: on('lcu-disconnected'),
+  // actualizaciones (botón de Ajustes)
+  updateState: () => ipcRenderer.invoke('update-state'),
+  updateCheck: () => ipcRenderer.invoke('update-check'),
+  updateInstall: () => ipcRenderer.invoke('update-install'),
+  onUpdateStatus: on('update-status'),
   // modo caster
   casterStart: (cfg: any) => ipcRenderer.invoke('caster-start', cfg),
   casterStop: () => ipcRenderer.invoke('caster-stop'),

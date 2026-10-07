@@ -827,6 +827,31 @@ ipcMain.on('open-atak', (_e, pagePath: string) => {
   if (!p.startsWith('/') || p.startsWith('//')) return;
   openAtakPage(p);
 });
+// ── Actualizaciones a petición (botón en Ajustes) ───────────────────────────
+// Buscar → descargar (automático) → "Instalar y reiniciar". Sin el botón, la
+// descarga quedaba en «pendiente» hasta cerrar la app del todo y nadie se
+// enteraba de que había versión nueva.
+type UpdateStatus = { state: 'idle' | 'checking' | 'none' | 'downloading' | 'ready' | 'error' | 'dev'; version?: string; percent?: number; error?: string; checkedAt?: number };
+let updateStatus: UpdateStatus = { state: app.isPackaged ? 'idle' : 'dev' };
+ipcMain.handle('update-state', () => ({ ...updateStatus, current: app.getVersion() }));
+ipcMain.handle('update-check', async () => {
+  if (!app.isPackaged) return { ...updateStatus, current: app.getVersion() };
+  if (updateStatus.state === 'ready' || updateStatus.state === 'downloading') return { ...updateStatus, current: app.getVersion() };
+  try {
+    updateStatus = { state: 'checking' }; broadcast('update-status', updateStatus);
+    await autoUpdater.checkForUpdates();
+  } catch (e: any) {
+    updateStatus = { state: 'error', error: String(e?.message || e).slice(0, 160) }; broadcast('update-status', updateStatus);
+  }
+  return { ...updateStatus, current: app.getVersion() };
+});
+ipcMain.handle('update-install', () => {
+  if (updateStatus.state !== 'ready') return { ok: false };
+  // isSilent=false muestra el instalador NSIS; isForceRunAfter=true reabre la app.
+  setImmediate(() => autoUpdater.quitAndInstall(false, true));
+  return { ok: true };
+});
+
 ipcMain.on('win', (e, action: 'minimize' | 'close' | 'hide') => {
   const w = BrowserWindow.fromWebContents(e.sender);
   if (!w) return;
@@ -1192,15 +1217,19 @@ app.whenReady().then(() => {
     try {
       autoUpdater.autoDownload = true;
       autoUpdater.autoInstallOnAppQuit = true;
+      const setUpd = (s: UpdateStatus) => { updateStatus = s; broadcast('update-status', s); };
+      autoUpdater.on('checking-for-update', () => setUpd({ state: 'checking' }));
+      autoUpdater.on('update-not-available', (info) => setUpd({ state: 'none', version: info.version, checkedAt: Date.now() }));
       autoUpdater.on('update-available', (info) => {
         console.log(`[updater] actualización disponible: v${info.version} — descargando…`);
-        broadcast('update-status', { state: 'downloading', version: info.version });
+        setUpd({ state: 'downloading', version: info.version, percent: 0 });
       });
+      autoUpdater.on('download-progress', (p) => setUpd({ state: 'downloading', version: updateStatus.version, percent: Math.round(p.percent) }));
       autoUpdater.on('update-downloaded', (info) => {
         console.log(`[updater] v${info.version} descargada — se instala al cerrar la app`);
-        broadcast('update-status', { state: 'ready', version: info.version });
+        setUpd({ state: 'ready', version: info.version });
       });
-      autoUpdater.on('error', (e) => console.warn('[updater] error:', e?.message));
+      autoUpdater.on('error', (e) => { console.warn('[updater] error:', e?.message); setUpd({ state: 'error', error: String(e?.message || e).slice(0, 160) }); });
       void autoUpdater.checkForUpdatesAndNotify();
       // Re-chequear cada 4h (sesiones largas de la app en bandeja).
       setInterval(() => { void autoUpdater.checkForUpdatesAndNotify(); }, 4 * 3600_000);

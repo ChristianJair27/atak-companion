@@ -12,6 +12,7 @@ import { fmtClock, phaseEs, useLive, useStatus } from './shared';
 import DraftView from './DraftView';
 import { EASE, Rise, Stagger, Ticker, rise, staggerParent, swap } from '../motion';
 import { HxHex, HxPanel, HxSegmented } from './hextech';
+import type { UpdateStatus } from '../App';
 import './home-motion.css';
 
 // ── Movimiento (constantes a nivel de módulo: no cambian entre renders, así el
@@ -144,6 +145,12 @@ export default function MainView() {
   const status = useStatus(2000); // refresco cada 2 s (feed.pushed / lastStatus)
   const live = useLive();
   const [tab, setTab] = useState<Tab>('inicio');
+  // Actualizaciones: estado que manda el main (buscar / descargando / lista).
+  const [upd, setUpd] = useState<UpdateStatus>({ state: 'idle' });
+  useEffect(() => {
+    void window.atak.updateState?.().then((s) => { if (s) setUpd(s); }).catch(() => {});
+    return window.atak.onUpdateStatus?.((s) => setUpd((prev) => ({ ...prev, ...s })));
+  }, []);
   const [caster, setCaster] = useState<CasterCfg>(loadCfg);
   const [showOverlay, setShowOverlay] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -618,6 +625,46 @@ export default function MainView() {
                         </motion.div>
                       ))}
                     </motion.div>
+                  </HxPanel>
+                </motion.div>
+
+                <motion.div variants={CARD}>
+                  <HxPanel corners className="hm-card" inner={{ padding: '14px 18px' }}>
+                    <div className="hx-label head" style={{ marginBottom: 10 }}>Actualizaciones</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700 }}>ATAK Companion v{pkg.version}</div>
+                        <div style={{ fontSize: 12.5, marginTop: 4, opacity: 0.75 }}>
+                          {upd.state === 'dev' && 'Modo desarrollo: sin actualizaciones.'}
+                          {upd.state === 'idle' && 'Se revisa al abrir la app y cada 4 horas.'}
+                          {upd.state === 'checking' && 'Buscando actualización…'}
+                          {upd.state === 'none' && `Estás al día (última: v${upd.version ?? pkg.version}).`}
+                          {upd.state === 'downloading' && `Descargando v${upd.version}… ${upd.percent ?? 0}%`}
+                          {upd.state === 'ready' && `v${upd.version} lista para instalar.`}
+                          {upd.state === 'error' && `No se pudo buscar: ${upd.error ?? 'error'}`}
+                        </div>
+                        {upd.state === 'downloading' && (
+                          <div style={{ marginTop: 8, height: 4, borderRadius: 2, background: 'rgba(255,255,255,.1)', overflow: 'hidden' }}>
+                            <div style={{ width: `${upd.percent ?? 0}%`, height: '100%', background: 'var(--ax-accent, #e8323c)', transition: 'width .3s ease' }} />
+                          </div>
+                        )}
+                      </div>
+                      {upd.state === 'ready' ? (
+                        <button type="button" className="hx-btn primary sm" style={{ flex: 'none' }} onClick={() => { void window.atak.updateInstall(); }}>
+                          Instalar y reiniciar
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="hx-btn ghost sm"
+                          style={{ flex: 'none' }}
+                          disabled={upd.state === 'checking' || upd.state === 'downloading' || upd.state === 'dev'}
+                          onClick={() => { setUpd((p) => ({ ...p, state: 'checking' })); void window.atak.updateCheck().then((s) => { if (s) setUpd(s); }); }}
+                        >
+                          Buscar actualización
+                        </button>
+                      )}
+                    </div>
                   </HxPanel>
                 </motion.div>
 
