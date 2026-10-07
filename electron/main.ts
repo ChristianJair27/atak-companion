@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { LcuService } from './services/lcu.js';
 import { LiveClientService, computeObjectives } from './services/live-client.js';
 import { FeedPusher, type FeedConfig } from './services/feed-push.js';
+import { ReplayFetcher } from './services/replay-fetcher.js';
 import { getPatchData } from './services/patch.js';
 import { AugmentDetector, CARD_GEOM, CARD_GEOM_ARENA } from './services/augment-detector.js';
 import { analyzeDraft, draftAiNames, type DraftRequest } from './services/draft-ai.js';
@@ -42,6 +43,14 @@ const FRONTEND = process.env.ATAK_FRONTEND || 'https://atakgg.revolution505.com'
 const lcu = new LcuService();
 const live = new LiveClientService();
 const feed = new FeedPusher();
+// Replays de torneo: baja los .rofl que faltan en ATAK.GG cuando el cliente
+// está en reposo y los sube. Se puede apagar desde Ajustes.
+const replays = new ReplayFetcher(lcu, BACKEND);
+replays.on('status', (s) => broadcast('replays-status', s));
+replays.start();
+ipcMain.handle('replays-status', () => ({ ...replays.status }));
+ipcMain.handle('replays-sync', async () => { await replays.tick(true); return { ...replays.status }; });
+ipcMain.handle('replays-enable', (_e, on: boolean) => { replays.setEnabled(!!on); return { ...replays.status }; });
 
 // ── Ventanas ─────────────────────────────────────────────────────────────────
 type WinKind = 'main' | 'hud' | 'champselect' | 'scoreboard' | 'eog' | 'caster' | 'players' | 'augments' | 'augbadges';

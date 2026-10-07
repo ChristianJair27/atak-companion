@@ -12,7 +12,7 @@ import { fmtClock, phaseEs, useLive, useStatus } from './shared';
 import DraftView from './DraftView';
 import { EASE, Rise, Stagger, Ticker, rise, staggerParent, swap } from '../motion';
 import { HxHex, HxPanel, HxSegmented } from './hextech';
-import type { UpdateStatus } from '../App';
+import type { ReplayStatus, UpdateStatus } from '../App';
 import './home-motion.css';
 
 // ── Movimiento (constantes a nivel de módulo: no cambian entre renders, así el
@@ -147,6 +147,11 @@ export default function MainView() {
   const [tab, setTab] = useState<Tab>('inicio');
   // Actualizaciones: estado que manda el main (buscar / descargando / lista).
   const [upd, setUpd] = useState<UpdateStatus>({ state: 'idle' });
+  const [rp, setRp] = useState<ReplayStatus>({ enabled: true, busy: false, pending: 0, uploaded: 0, skipped: 0, last: '', lastAt: 0 });
+  useEffect(() => {
+    void window.atak.replaysStatus?.().then((s) => { if (s) setRp(s); }).catch(() => {});
+    return window.atak.onReplaysStatus?.((s) => setRp(s));
+  }, []);
   useEffect(() => {
     void window.atak.updateState?.().then((s) => { if (s) setUpd(s); }).catch(() => {});
     return window.atak.onUpdateStatus?.((s) => setUpd((prev) => ({ ...prev, ...s })));
@@ -625,6 +630,31 @@ export default function MainView() {
                         </motion.div>
                       ))}
                     </motion.div>
+                  </HxPanel>
+                </motion.div>
+
+                <motion.div variants={CARD}>
+                  <HxPanel corners className="hm-card" inner={{ padding: '14px 18px' }}>
+                    <div className="hx-label head" style={{ marginBottom: 10 }}>Replays de torneo</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700 }}>
+                          {rp.enabled ? (rp.pending ? `${rp.pending} partidas por subir` : 'Archivo de replays al día') : 'Desactivado'}
+                          {rp.uploaded ? <span style={{ opacity: 0.7, fontWeight: 500 }}> · {rp.uploaded} subidas hoy</span> : null}
+                        </div>
+                        <div style={{ fontSize: 12.5, marginTop: 4, opacity: 0.75 }}>
+                          {rp.last || 'Sube a ATAK.GG los replays de las partidas de torneo que falten, solo cuando el cliente está en reposo.'}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flex: 'none' }}>
+                        <button type="button" className="hx-btn ghost sm" disabled={rp.busy || !rp.enabled} onClick={() => { void window.atak.replaysSync?.().then((s) => { if (s) setRp(s); }); }}>
+                          {rp.busy ? 'Subiendo…' : 'Sincronizar'}
+                        </button>
+                        <button type="button" className="hx-btn ghost sm" onClick={() => { void window.atak.replaysEnable?.(!rp.enabled).then((s) => { if (s) setRp(s); }); }}>
+                          {rp.enabled ? 'Pausar' : 'Activar'}
+                        </button>
+                      </div>
+                    </div>
                   </HxPanel>
                 </motion.div>
 

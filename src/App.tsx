@@ -14,6 +14,8 @@ import CasterView from './views/CasterView';
 import AugmentsView from './views/AugmentsView';
 import AugBadgesView from './views/AugBadgesView';
 
+export type ReplayStatus = { enabled: boolean; busy: boolean; pending: number; uploaded: number; skipped: number; last: string; lastAt: number };
+
 export type UpdateStatus = {
   state: 'idle' | 'checking' | 'none' | 'downloading' | 'ready' | 'error' | 'dev';
   version?: string; percent?: number; error?: string; checkedAt?: number; current?: string;
@@ -85,6 +87,10 @@ declare global {
       }>>;
       togglePlayers: () => Promise<{ ok: boolean; open: boolean }>;
       toggleOverlay: (kind: 'hud' | 'scoreboard' | 'players' | 'champselect') => Promise<{ ok: boolean }>;
+      replaysStatus: () => Promise<ReplayStatus>;
+      replaysSync: () => Promise<ReplayStatus>;
+      replaysEnable: (on: boolean) => Promise<ReplayStatus>;
+      onReplaysStatus: (fn: (s: ReplayStatus) => void) => () => void;
       updateState: () => Promise<UpdateStatus>;
       updateCheck: () => Promise<UpdateStatus>;
       updateInstall: () => Promise<{ ok: boolean }>;

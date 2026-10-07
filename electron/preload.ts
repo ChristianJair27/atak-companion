@@ -25,6 +25,11 @@ contextBridge.exposeInMainWorld('atak', {
   onSummoner: on('summoner'),
   onLcuConnected: on('lcu-connected'),
   onLcuDisconnected: on('lcu-disconnected'),
+  // replays de torneo (Ajustes)
+  replaysStatus: () => ipcRenderer.invoke('replays-status'),
+  replaysSync: () => ipcRenderer.invoke('replays-sync'),
+  replaysEnable: (on: boolean) => ipcRenderer.invoke('replays-enable', on),
+  onReplaysStatus: on('replays-status'),
   // actualizaciones (botón de Ajustes)
   updateState: () => ipcRenderer.invoke('update-state'),
   updateCheck: () => ipcRenderer.invoke('update-check'),
