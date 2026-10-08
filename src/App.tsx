@@ -14,6 +14,7 @@ import CasterView from './views/CasterView';
 import AugmentsView from './views/AugmentsView';
 import AugBadgesView from './views/AugBadgesView';
 
+export interface AutofeedStatus { enabled: boolean; at: number; text: string; channel: string; sending: boolean }
 export type ReplayStatus = { enabled: boolean; busy: boolean; pending: number; uploaded: number; skipped: number; last: string; lastAt: number };
 
 export type UpdateStatus = {
@@ -91,6 +92,9 @@ declare global {
       replaysSync: () => Promise<ReplayStatus>;
       replaysEnable: (on: boolean) => Promise<ReplayStatus>;
       onReplaysStatus: (fn: (s: ReplayStatus) => void) => () => void;
+      autofeedStatus: () => Promise<AutofeedStatus>;
+      autofeedEnable: (on: boolean) => Promise<AutofeedStatus>;
+      onAutofeedStatus: (fn: (s: AutofeedStatus) => void) => () => void;
       updateState: () => Promise<UpdateStatus>;
       updateCheck: () => Promise<UpdateStatus>;
       updateInstall: () => Promise<{ ok: boolean }>;

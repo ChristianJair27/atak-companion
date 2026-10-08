@@ -12,7 +12,7 @@ import { fmtClock, phaseEs, useLive, useStatus } from './shared';
 import DraftView from './DraftView';
 import { EASE, Rise, Stagger, Ticker, rise, staggerParent, swap } from '../motion';
 import { HxHex, HxPanel, HxSegmented } from './hextech';
-import type { ReplayStatus, UpdateStatus } from '../App';
+import type { ReplayStatus, AutofeedStatus, UpdateStatus } from '../App';
 import './home-motion.css';
 
 // ── Movimiento (constantes a nivel de módulo: no cambian entre renders, así el
@@ -148,6 +148,11 @@ export default function MainView() {
   // Actualizaciones: estado que manda el main (buscar / descargando / lista).
   const [upd, setUpd] = useState<UpdateStatus>({ state: 'idle' });
   const [rp, setRp] = useState<ReplayStatus>({ enabled: true, busy: false, pending: 0, uploaded: 0, skipped: 0, last: '', lastAt: 0 });
+  const [af, setAf] = useState<AutofeedStatus>({ enabled: true, at: 0, text: 'Sin partida en curso', channel: '', sending: false });
+  useEffect(() => {
+    void window.atak.autofeedStatus?.().then((s) => { if (s) setAf(s); }).catch(() => {});
+    return window.atak.onAutofeedStatus?.((s) => setAf(s));
+  }, []);
   useEffect(() => {
     void window.atak.replaysStatus?.().then((s) => { if (s) setRp(s); }).catch(() => {});
     return window.atak.onReplaysStatus?.((s) => setRp(s));
@@ -630,6 +635,25 @@ export default function MainView() {
                         </motion.div>
                       ))}
                     </motion.div>
+                  </HxPanel>
+                </motion.div>
+
+                <motion.div variants={CARD}>
+                  <HxPanel corners className="hm-card" inner={{ padding: '14px 18px' }}>
+                    <div className="hx-label head" style={{ marginBottom: 10 }}>Datos al overlay del torneo</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700 }}>{af.enabled ? (af.sending ? 'Enviando tu partida al stream' : 'Activado') : 'Desactivado'}</div>
+                        <div style={{ fontSize: 12.5, marginTop: 4, opacity: 0.75 }}>
+                          {af.enabled ? af.text : 'Cuando juegas una partida de torneo de ATAK.GG, tu cliente aporta dragones, larvas, heraldo y barón al overlay del stream (el espectador no los recibe).'}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flex: 'none' }}>
+                        <button type="button" className="hx-btn ghost sm" onClick={() => { void window.atak.autofeedEnable?.(!af.enabled).then((s) => { if (s) setAf(s); }); }}>
+                          {af.enabled ? 'Pausar' : 'Activar'}
+                        </button>
+                      </div>
+                    </div>
                   </HxPanel>
                 </motion.div>
 

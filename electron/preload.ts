@@ -30,6 +30,9 @@ contextBridge.exposeInMainWorld('atak', {
   replaysSync: () => ipcRenderer.invoke('replays-sync'),
   replaysEnable: (on: boolean) => ipcRenderer.invoke('replays-enable', on),
   onReplaysStatus: on('replays-status'),
+  autofeedStatus: () => ipcRenderer.invoke('autofeed-status'),
+  autofeedEnable: (on: boolean) => ipcRenderer.invoke('autofeed-enable', on),
+  onAutofeedStatus: on('autofeed-status'),
   // actualizaciones (botón de Ajustes)
   updateState: () => ipcRenderer.invoke('update-state'),
   updateCheck: () => ipcRenderer.invoke('update-check'),

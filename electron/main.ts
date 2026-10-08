@@ -51,6 +51,9 @@ replays.start();
 ipcMain.handle('replays-status', () => ({ ...replays.status }));
 ipcMain.handle('replays-sync', async () => { await replays.tick(true); return { ...replays.status }; });
 ipcMain.handle('replays-enable', (_e, on: boolean) => { replays.setEnabled(!!on); return { ...replays.status }; });
+const autofeedStatus = () => ({ enabled: feed.autoEnabled, ...feed.autoStatus });
+ipcMain.handle('autofeed-status', () => autofeedStatus());
+ipcMain.handle('autofeed-enable', (_e, on: boolean) => { feed.autoEnabled = !!on; if (!on) feed.autoStatus = { at: Date.now(), text: 'Desactivado', channel: '', sending: false }; return autofeedStatus(); });
 
 // ── Ventanas ─────────────────────────────────────────────────────────────────
 type WinKind = 'main' | 'hud' | 'champselect' | 'scoreboard' | 'eog' | 'caster' | 'players' | 'augments' | 'augbadges';
@@ -771,6 +774,9 @@ live.on('state', (state) => {
   if (feed.active) {
     void feed.push(state);
     dumpRawForDebug(state);
+  } else {
+    // Jugador de torneo: aporta la partida al overlay del stream (el backend decide si lo es).
+    void feed.pushAuto(state, BACKEND).then(() => broadcast('autofeed-status', autofeedStatus()));
   }
 });
 
