@@ -799,7 +799,18 @@ export interface PickSuggestion {
   badInto: string[];
   /** Huecos de comp que cubre ('AP', 'AD', 'frontline'…). */
   covers: string[];
+  /** Tu winrate con el campeón esta temporada (0-100) y tus partidas, si OP.GG las tiene. */
+  myWinRate: number | null;
+  myGames: number;
+  /** Puntos de maestría propios (0 si no se conocen). */
+  myMastery: number;
+  /** Puesto que le dio la IA (1 = mejor) y su razón, cuando hubo re-ranking. */
+  aiRank?: number;
+  aiReason?: string;
 }
+
+/** Tu historial con cada campeón (clave = nombre normalizado). */
+export type ChampPool = Record<string, { play: number; win: number; mastery?: number }>;
 
 /** map con concurrencia limitada: el MCP no lleva bien 8 llamadas a la vez. */
 async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -835,6 +846,10 @@ export async function getPickSuggestions(opts: {
   rivalName?: string;
   /** Consultar matchups reales en OP.GG (más lento, mucho mejor). */
   deep?: boolean;
+  /** Tu pool: partidas/victorias de la temporada (OP.GG) y maestría (LCU). */
+  pool?: ChampPool;
+  /** Nombres normalizados de los campeones que PUEDES elegir ahora (null = sin filtro). */
+  pickable?: Set<string> | null;
 }): Promise<PickSuggestion[]> {
   const meta = await getLaneMeta(opts.position || 'MIDDLE');
   const banned = new Set(opts.bannedNames.map((n) => n.toLowerCase().replace(/[^a-z0-9]/g, '')));
@@ -863,6 +878,8 @@ export async function getPickSuggestions(opts: {
   for (const m of meta) {
     const needle = m.name.toLowerCase().replace(/[^a-z0-9]/g, '');
     if (!needle || banned.has(needle) || picked.has(needle)) continue;
+    // Sugerir un campeón que no tienes es inútil: el hover fallaría.
+    if (opts.pickable && opts.pickable.size && !opts.pickable.has(needle)) continue;
     const wr = asFraction(m.winRate || 0);
     const pr = asFraction(m.pickRate || 0);
     let score = 100 - (m.rank || 50);
@@ -879,8 +896,20 @@ export async function getPickSuggestions(opts: {
     if (missing.has('TANK') && roles.has('TANK')) { score += 5; covers.push('frontline'); }
     if (missing.has('ENGAGE') && roles.has('ENGAGE')) { score += 4; covers.push('engage'); }
 
+    // Tu historial pesa: un campeón que dominas con buen winrate vale más que el
+    // nº1 del meta que nunca has jugado. Experiencia saturada a ~30 partidas.
+    const mine = (opts.pool || {})[needle];
+    const myGames = mine?.play || 0;
+    const myWr = myGames ? (mine!.win || 0) / myGames : null;
+    const myMastery = mine?.mastery || 0;
+    const exp = Math.min(1, Math.log1p(myGames) / Math.log1p(30));
+    score += exp * 12;
+    if (myWr != null && myGames >= 5) score += (myWr - 0.5) * 80 * exp;
+    if (myMastery >= 200_000) score += 8; else if (myMastery >= 50_000) score += 4;
+
     const base = `Meta ${opts.position || 'lane'} · T${m.tier}`;
-    const reason = covers.length ? `Cubre ${covers.join(' + ')} · ${base}` : base;
+    const own = myGames >= 5 && myWr != null ? `tu ${Math.round(myWr * 100)}% (${myGames} p)` : '';
+    const reason = [covers.length ? `Cubre ${covers.join(' + ')}` : '', own, base].filter(Boolean).join(' · ');
 
     out.push({
       name: m.name,
@@ -894,6 +923,9 @@ export async function getPickSuggestions(opts: {
       goodInto: [],
       badInto: [],
       covers,
+      myWinRate: myWr != null && myGames >= 5 ? Math.round(myWr * 1000) / 10 : null,
+      myGames,
+      myMastery,
     });
   }
 
@@ -912,7 +944,7 @@ export async function getPickSuggestions(opts: {
 
   // Solo los mejores candidatos del meta: cada uno es una llamada al MCP y la
   // fase de pick dura ~30s. Con caché caliente esto es instantáneo.
-  const deepCount = Math.min(out.length, (opts.limit ?? 6) + 4);
+  const deepCount = Math.min(out.length, (opts.limit ?? 6) + 6, 12);
   const head = out.slice(0, deepCount);
 
   await mapPool(head, 6, async (s) => {
@@ -946,6 +978,8 @@ export async function getPickSuggestions(opts: {
     const bits: string[] = [];
     if (s.matchupWinRate != null) bits.push(`${s.matchupWinRate}% vs ${rival}`);
     if (s.goodInto.length) bits.push(`gana a ${s.goodInto.slice(0, 2).join(', ')}`);
+    if (s.badInto.length) bits.push(`pierde con ${s.badInto.slice(0, 2).join(', ')}`);
+    if (s.myWinRate != null) bits.push(`tu ${s.myWinRate}% (${s.myGames} p)`);
     if (s.covers.length) bits.push(`cubre ${s.covers.join(' + ')}`);
     if (bits.length) s.reason = `${bits.join(' · ')} · T${s.tier}`;
   });

@@ -65,6 +65,8 @@ export class LcuService extends EventEmitter {
   rankedBeforeGame: RankedSnapshot | null = null;
   /** Cola de la partida actual (420 solo, 440 flex, 450 aram…). */
   currentQueueId: number | null = null;
+  /** true = partida personalizada (las de torneo lo son); false = cola normal; null = no se sabe. */
+  currentIsCustom: boolean | null = null;
   /** queueType de ranked de ESTA partida (RANKED_SOLO_5x5 | RANKED_FLEX_SR | null). */
   rankedQueueType: string | null = null;
 
@@ -188,6 +190,12 @@ export class LcuService extends EventEmitter {
       }
     }
     return null;
+  }
+
+  /** Campeones que el jugador local puede elegir en ESTE champ select (propios + rotación). */
+  async pickableChampionIds(): Promise<number[]> {
+    const r = await this.get<any>('/lol-champ-select/v1/pickable-champion-ids');
+    return Array.isArray(r) ? r.map(Number).filter((n) => n > 0) : [];
   }
 
   /** Deja el campeón en "hover" (intención de pick, visible para tu equipo). */
@@ -331,6 +339,7 @@ export class LcuService extends EventEmitter {
         void this.get<any>('/lol-gameflow/v1/session').then((s) => {
           const qid = Number(s?.gameData?.queue?.id) || null;
           if (qid) this.currentQueueId = qid;
+          if (typeof s?.gameData?.isCustomGame === 'boolean') this.currentIsCustom = s.gameData.isCustomGame;
         });
       }
       this.emit('phase', phase);
@@ -388,6 +397,7 @@ export class LcuService extends EventEmitter {
     const session = await this.get<any>('/lol-gameflow/v1/session');
     const qid = Number(session?.gameData?.queue?.id) || null;
     this.currentQueueId = qid;
+    this.currentIsCustom = typeof session?.gameData?.isCustomGame === 'boolean' ? session.gameData.isCustomGame : (qid === 0 ? true : qid ? false : null);
     this.rankedQueueType =
       qid === 420 ? 'RANKED_SOLO_5x5'
       : qid === 440 ? 'RANKED_FLEX_SR'

@@ -24,6 +24,16 @@ La app se actualiza sola cuando publicamos una versión nueva. ¿Algo falla? Abr
 - **Runas en un clic**: crea la página recomendada en tu cliente y la deja activa (reutiliza siempre la misma página "ATAK", nunca borra las tuyas).
 - Timer por fase, bans, comp analysis y tip escrito del matchup.
 
+**Auto-pick (0.4.5).** En la pestaña *Sugerencias de pick* hay dos interruptores: **Auto-hover** deja en hover el mejor pick y lo cambia solo cuando el draft cambia (counter del rival, huecos de la comp); si eliges otro campeón a mano, se detiene. **Auto-lock** confirma el pick cuando quedan 4 s de tu turno (solo si sigue en hover el recomendado; apagado por defecto). Las sugerencias ya cuentan con tu pool (winrate y partidas de la temporada en OP.GG, maestría) y solo proponen campeones que puedes elegir.
+
+**IA del draft sin variables de entorno.** Crea `%APPDATA%tak-companioni.json`:
+
+```json
+{ "anthropicApiKey": "sk-ant-...", "claudeModel": "claude-sonnet-5-5" }
+```
+
+o, para un Ollama propio, `{ "ollamaUrl": "http://host:11434/api/chat", "ollamaModel": "atak-coach" }`. Con eso la IA reordena los 3 mejores picks y explica por qué (chip **IA** en el panel). Sin IA rápida se queda el orden estadístico; el backend hosteado no se usa para picks porque tarda demasiado.
+
 ### 📊 In-game
 - **HUD** del jugador local (F9).
 - **Scoreboard 5v5 en vivo** (Ctrl+Shift+S).

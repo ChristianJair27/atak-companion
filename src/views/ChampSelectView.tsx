@@ -220,7 +220,20 @@ export default function ChampSelectView() {
   const [suggestions, setSuggestions] = useState<Array<{
     name: string; winRate: number | null; pickRate: number | null; tier: number | null; reason: string;
     matchupWinRate?: number | null; vsRival?: string; goodInto?: string[]; badInto?: string[]; covers?: string[];
+    myWinRate?: number | null; myGames?: number; aiRank?: number; aiReason?: string;
   }>>([]);
+  const [aiInfo, setAiInfo] = useState<{ provider: string; model: string } | null>(null);
+  // Auto-hover: el companion deja en hover el mejor pick y lo cambia cuando el draft
+  // cambia (counter del rival, huecos de comp). Auto-lock: confirma cuando quedan
+  // pocos segundos de TU turno. Se apagan en cuanto eliges a mano otro campeón.
+  const [autoHover, setAutoHover] = useState<boolean>(() => { try { return localStorage.getItem('atak.cs.autohover') !== '0'; } catch { return true; } });
+  const [autoLock, setAutoLock] = useState<boolean>(() => { try { return localStorage.getItem('atak.cs.autolock') === '1'; } catch { return false; } });
+  const autoHoveredRef = useRef<string>('');
+  const manualRef = useRef(false);
+  const lastAutoAtRef = useRef(0);
+  const lockedRef = useRef(false);
+  useEffect(() => { try { localStorage.setItem('atak.cs.autohover', autoHover ? '1' : '0'); } catch { /* */ } if (autoHover) manualRef.current = false; }, [autoHover]);
+  useEffect(() => { try { localStorage.setItem('atak.cs.autolock', autoLock ? '1' : '0'); } catch { /* */ } }, [autoLock]);
   const [suggLoading, setSuggLoading] = useState(false);
   const [refining, setRefining] = useState(false);
   const [rivalOverride, setRivalOverride] = useState('');
@@ -234,7 +247,8 @@ export default function ChampSelectView() {
       window.atak.onChampionBuildLoading((p: any) => setBuild({ loading: true, ...p })),
       window.atak.onChampionBuildError((p: any) => setBuild({ error: p?.error || 'Error al cargar la build' })),
       window.atak.onChampSelectEnded(() => {
-        setCs(null); setBuild(null); setSuggestions([]); setRivalOverride(''); setFeedback(null);
+        setCs(null); setBuild(null); setSuggestions([]); setRivalOverride(''); setFeedback(null); setAiInfo(null);
+        autoHoveredRef.current = ''; manualRef.current = false; lockedRef.current = false;
       }),
     ];
     return () => offs.forEach((off) => off());
@@ -350,11 +364,27 @@ export default function ChampSelectView() {
         const fast = await window.atak.opggPickSuggestions({ ...base, deep: false });
         if (!cancelled && Array.isArray(fast) && fast.length) { setSuggestions(fast); setSuggLoading(false); setRefining(true); }
       } catch { /* lo intenta el pase profundo */ }
+      let deepList: any[] = [];
       try {
         const deep = await window.atak.opggPickSuggestions({ ...base, deep: true });
-        if (!cancelled && Array.isArray(deep) && deep.length) setSuggestions(deep);
+        if (!cancelled && Array.isArray(deep) && deep.length) { deepList = deep; setSuggestions(deep); }
       } catch { /* conserva las rápidas */ }
       finally { if (!cancelled) { setSuggLoading(false); setRefining(false); } }
+      // Tercer pase: la IA (si hay Claude u Ollama local) reordena los mejores y explica.
+      if (cancelled || deepList.length < 2) return;
+      try {
+        const ai = await window.atak.pickAiRerank({
+          position: myPos || 'MIDDLE', missing: comp.missing, rival: rival || undefined,
+          allies: team.filter((p: any) => p.championName && !p.isLocal).map((p: any) => p.championName),
+          enemies: enemyNames,
+          candidates: deepList.map((s: any) => ({ name: s.name, winRate: s.winRate, tier: s.tier, matchupWinRate: s.matchupWinRate ?? null, goodInto: s.goodInto || [], badInto: s.badInto || [], covers: s.covers || [], myWinRate: s.myWinRate ?? null, myGames: s.myGames || 0 })),
+        });
+        if (cancelled || !ai?.order?.length) return;
+        const rank = new Map(ai.order.map((o, i) => [o.name, { i: i + 1, why: o.why }]));
+        const merged = deepList.map((s: any) => ({ ...s, aiRank: rank.get(s.name)?.i, aiReason: rank.get(s.name)?.why }))
+          .sort((a: any, b: any) => (a.aiRank ?? 99) - (b.aiRank ?? 99) || b.score - a.score);
+        setSuggestions(merged); setAiInfo({ provider: ai.provider, model: ai.model });
+      } catch { /* sin IA: orden estadístico */ }
     }, 600);
     return () => { cancelled = true; clearTimeout(t); };
   }, [draftKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -367,9 +397,36 @@ export default function ChampSelectView() {
     if (championName) void window.atak.championPreview(championName, myPos || 'MIDDLE', rival);
   }, [myPos, rival]);
   const pickSuggestion = useCallback((championName: string) => {
+    // Clic del usuario: a partir de aquí el auto-hover no le pisa la elección.
+    manualRef.current = true; autoHoveredRef.current = '';
     showBuildFor(championName);
     void runAction('hover', () => window.atak.champSelectHover(championName), `${championName} en hover`);
   }, [showBuildFor, runAction]);
+
+  // ── Auto-hover / auto-lock ────────────────────────────────────────────────
+  const myPickState = (cs?.myPick || null) as null | { pending: boolean; inProgress: boolean; locked: boolean };
+  const top = suggestions[0]?.name || '';
+  useEffect(() => {
+    if (!cs || !autoHover || !top || !myPickState?.pending || myPickState.locked) return;
+    if (phase === 'FINALIZATION') return;
+    // Si el jugador puso otro campeón a mano, se respeta hasta que reactive el auto.
+    if (myChampName && autoHoveredRef.current && myChampName.toLowerCase() !== autoHoveredRef.current.toLowerCase()) manualRef.current = true;
+    if (manualRef.current) return;
+    if (myChampName.toLowerCase() === top.toLowerCase()) return;
+    if (Date.now() - lastAutoAtRef.current < 1500) return;
+    lastAutoAtRef.current = Date.now();
+    void (async () => {
+      const r = await window.atak.champSelectHover(top).catch(() => ({ ok: false }));
+      if (r.ok) { autoHoveredRef.current = top; showBuildFor(top); setFeedback({ ok: true, msg: `Auto: ${top} en hover` }); }
+    })();
+  }, [cs, autoHover, top, myChampName, phase]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!cs || !autoLock || !top || !myPickState?.inProgress || myPickState.locked || lockedRef.current) return;
+    if (manualRef.current || !myChampName || myChampName.toLowerCase() !== top.toLowerCase()) return;
+    if (timerSecs > 4 || timerSecs <= 0) return;
+    lockedRef.current = true;
+    void runAction('lock', () => window.atak.champSelectLock(top), `Auto: ${top} confirmado`);
+  }, [cs, autoLock, top, myChampName, timerSecs]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!myChampName || !rival) return;
     void window.atak.championPreview(myChampName, myPos || 'MIDDLE', rival);
@@ -594,6 +651,11 @@ export default function ChampSelectView() {
                         <span className="hx-faint" style={{ marginLeft: 8, fontWeight: 500 }}>{rival ? `· vs ${rival} · clic = hover + runas` : '· clic = hover + runas'}</span>
                         {refining && <span className="hx-faint" style={{ marginLeft: 8, fontWeight: 500 }}>· afinando con el matchup…</span>}
                       </span>
+                      <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <button type="button" className={`hx-pill${autoHover ? ' ok' : ''}`} onClick={() => setAutoHover((v) => !v)} title="Deja en hover el mejor pick y lo cambia con el draft. Si eliges otro a mano, se detiene.">Auto-hover {autoHover ? 'ON' : 'OFF'}</button>
+                        <button type="button" className={`hx-pill${autoLock ? ' ok' : ''}`} onClick={() => setAutoLock((v) => !v)} title="Confirma el pick cuando quedan 4 s de tu turno (solo si sigue en hover el recomendado).">Auto-lock {autoLock ? 'ON' : 'OFF'}</button>
+                        {aiInfo && <span className="hx-pill" title={`${aiInfo.provider} · ${aiInfo.model}`}>IA</span>}
+                      </span>
                       {comp.missing.length > 0 && <span style={{ fontSize: 12, color: 'var(--hx-neg)', fontWeight: 700 }}>Falta: {comp.missing.join(' · ')}</span>}
                     </div>
                     <AnimatePresence mode="wait" initial={false}>
@@ -604,7 +666,7 @@ export default function ChampSelectView() {
                       ) : bounceItems.length > 0 ? (
                         <motion.div key="list" {...xfade}>
                           <BounceCards items={bounceItems} cardWidth={90} cardHeight={126} rotations={[0]} lifts={[0]} animationDelay={0.05} animationStagger={0.04} />
-                          <div className="hx-muted" style={{ marginTop: 8, fontSize: 12.5, textAlign: 'center' }}>{suggestions[0]?.reason || 'Meta OP.GG · se actualiza en cada pick/ban'}</div>
+                          <div className="hx-muted" style={{ marginTop: 8, fontSize: 12.5, textAlign: 'center' }}>{suggestions[0]?.aiReason ? `${suggestions[0].name}: ${suggestions[0].aiReason}` : (suggestions[0]?.reason || 'Meta OP.GG · se actualiza en cada pick/ban')}</div>
                         </motion.div>
                       ) : (
                         <motion.div key="empty" {...xfade} className="hx-label" style={{ textAlign: 'center', color: 'var(--hx-faint)', padding: 8 }}>Sin sugerencias (bans/picks o OP.GG offline)</motion.div>

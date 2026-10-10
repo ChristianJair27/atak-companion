@@ -65,6 +65,7 @@ contextBridge.exposeInMainWorld('atak', {
   matchupData: (championName: string, opponentName: string, position: string) =>
     ipcRenderer.invoke('matchup-data', championName, opponentName, position),
   // Acciones sobre el cliente de League (siempre disparadas por el usuario)
+  pickAiRerank: (req: any) => ipcRenderer.invoke('pick-ai-rerank', req),
   champSelectHover: (championName: string) => ipcRenderer.invoke('champ-select-hover', championName),
   champSelectLock: (championName?: string) => ipcRenderer.invoke('champ-select-lock', championName),
   applyRunes: (page: {

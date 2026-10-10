@@ -88,12 +88,15 @@ export class FeedPusher {
   autoStatus: { at: number; text: string; channel: string; sending: boolean } = { at: 0, text: 'Sin partida en curso', channel: '', sending: false };
   private autoSkipUntil = 0;
   private autoBusy = false;
-  async pushAuto(state: GameState, backend: string): Promise<void> {
+  async pushAuto(state: GameState, backend: string, isCustom: boolean | null = null): Promise<void> {
     if (!this.autoEnabled || this.autoBusy || Date.now() < this.autoSkipUntil) return;
     if (!state.me?.riotId) { this.autoStatus = { at: Date.now(), text: 'Espectando: el cliente no entrega objetivos', channel: '', sending: false }; return; }
+    // Solo las partidas personalizadas pueden ser de torneo: una ranked/normal/flex
+    // de un equipo registrado no debe aparecer en el tablero del torneo.
+    if (isCustom === false) { this.autoStatus = { at: Date.now(), text: 'Cola normal: no se envía al torneo', channel: '', sending: false }; return; }
     this.autoBusy = true;
     try {
-      const r = await this.post(`${backend.replace(/\/$/, '')}/api/live-feed/auto/push`, this.snapshotBase(state), null);
+      const r = await this.post(`${backend.replace(/\/$/, '')}/api/live-feed/auto/push`, { ...this.snapshotBase(state), isCustom }, null);
       if (r.ok && r.body?.ok) this.autoStatus = { at: Date.now(), text: `Enviando tu partida al overlay de ${r.body.channel}`, channel: String(r.body.channel || ''), sending: true };
       else { this.autoSkipUntil = Date.now() + 60_000; this.autoStatus = { at: Date.now(), text: r.body?.reason === 'not_tournament' ? 'Esta partida no es de un torneo de ATAK.GG' : `Sin respuesta del servidor (${r.code ?? 'red'})`, channel: '', sending: false }; }
     } finally { this.autoBusy = false; }

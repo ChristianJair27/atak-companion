@@ -6,7 +6,7 @@
 // de DDragon) y todo lo que devuelve se valida contra DDragon.
 //
 // Proveedores (en orden): Claude (ANTHROPIC_API_KEY) → Ollama local
-// (modelo "atak-coach", ver ollama/Modelfile; cae a OLLAMA_MODEL) → backend
+// (modelo "atak-coach", ver ollama/Modelfile; cae a cfg.ollamaModel) → backend
 // ATAK (/api/ai/draft-coach, Ollama hosteado) → sin IA (build del matchup
 // OP.GG con reglas deterministas).
 import { getPatchData } from './patch.js';
@@ -110,11 +110,19 @@ const DMG_TAGS = (tags: string[]) => {
 };
 
 // ── Proveedores ──────────────────────────────────────────────────────────────
-const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
-const CLAUDE_MODEL = process.env.ATAK_CLAUDE_MODEL || 'claude-sonnet-5-5';
-const OLLAMA_URL = (process.env.OLLAMA_URL || 'http://localhost:11434/api/chat').replace(/\/$/, '');
-const OLLAMA_MODEL = process.env.ATAK_OLLAMA_MODEL || 'atak-coach';
-const OLLAMA_FALLBACK = process.env.OLLAMA_MODEL || 'llama3.1:8b';
+// Configurable sin variables de entorno: main carga <userData>/ai.json
+// ({ "anthropicApiKey", "claudeModel", "ollamaUrl", "ollamaModel" }) y llama a configureDraftAi.
+const cfg = {
+  anthropicKey: process.env.ANTHROPIC_API_KEY || '',
+  claudeModel: process.env.ATAK_CLAUDE_MODEL || 'claude-sonnet-5-5',
+  ollamaUrl: (process.env.OLLAMA_URL || 'http://localhost:11434/api/chat').replace(/\/$/, ''),
+  ollamaModel: process.env.ATAK_OLLAMA_MODEL || 'atak-coach',
+  ollamaFallback: process.env.OLLAMA_MODEL || 'llama3.1:8b',
+};
+export function configureDraftAi(o: Partial<typeof cfg>) {
+  for (const [k, v] of Object.entries(o)) if (typeof v === 'string' && v.trim()) (cfg as any)[k] = k === 'ollamaUrl' ? v.trim().replace(/\/$/, '') : v.trim();
+}
+export function draftAiProvider(): string { return cfg.anthropicKey ? `claude (${cfg.claudeModel})` : `ollama local (${cfg.ollamaModel})`; }
 const BACKEND = (process.env.ATAK_BACKEND || 'https://atakback.revolution505.com').replace(/\/$/, '');
 
 async function askBackend(system: string, user: string, timeoutMs: number): Promise<{ content: string; model: string }> {
@@ -137,8 +145,8 @@ async function askClaude(system: string, user: string, timeoutMs: number): Promi
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 1800, system, messages: [{ role: 'user', content: user }] }),
+      headers: { 'content-type': 'application/json', 'x-api-key': cfg.anthropicKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: cfg.claudeModel, max_tokens: 1800, system, messages: [{ role: 'user', content: user }] }),
       signal: ctl.signal,
     });
     if (!res.ok) throw new Error(`Claude HTTP ${res.status}`);
@@ -149,7 +157,7 @@ async function askClaude(system: string, user: string, timeoutMs: number): Promi
 
 async function ollamaHasModel(model: string): Promise<boolean> {
   try {
-    const res = await fetch(OLLAMA_URL.replace(/\/api\/chat$/, '/api/tags'));
+    const res = await fetch(cfg.ollamaUrl.replace(/\/api\/chat$/, '/api/tags'));
     const j: any = res.ok ? await res.json() : null;
     return (j?.models || []).some((m: any) => String(m?.name || '').split(':')[0] === model.split(':')[0]);
   } catch { return false; }
@@ -159,7 +167,7 @@ async function askOllama(model: string, system: string, user: string, timeoutMs:
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const res = await fetch(OLLAMA_URL, {
+    const res = await fetch(cfg.ollamaUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -359,11 +367,11 @@ Devuelve SOLO este JSON${compact ? ' (breve: resumen de 1 frase, 3 puntos de pla
     } catch (e: any) { console.warn(`[draft-ai] ${name} falló:`, e?.message); }
     return false;
   };
-  const hasLocalOllama = !ANTHROPIC_KEY && (await ollamaHasModel(OLLAMA_MODEL).catch(() => false) || await ollamaHasModel(OLLAMA_FALLBACK).catch(() => false));
+  const hasLocalOllama = !cfg.anthropicKey && (await ollamaHasModel(cfg.ollamaModel).catch(() => false) || await ollamaHasModel(cfg.ollamaFallback).catch(() => false));
   const done =
-    (ANTHROPIC_KEY && await tryProvider('claude', async () => ({ content: await askClaude(SYSTEM_PROMPT, user, 45_000), model: CLAUDE_MODEL })))
+    (cfg.anthropicKey && await tryProvider('claude', async () => ({ content: await askClaude(SYSTEM_PROMPT, user, 45_000), model: cfg.claudeModel })))
     || (hasLocalOllama && await tryProvider('ollama', async () => {
-      const m = (await ollamaHasModel(OLLAMA_MODEL)) ? OLLAMA_MODEL : OLLAMA_FALLBACK;
+      const m = (await ollamaHasModel(cfg.ollamaModel)) ? cfg.ollamaModel : cfg.ollamaFallback;
       return { content: await askOllama(m, SYSTEM_PROMPT, user, 90_000), model: m };
     }))
     || await tryProvider('backend', () => askBackend(SYSTEM_PROMPT, userCompact, 300_000));
@@ -437,3 +445,63 @@ export async function draftAiNames(version?: string): Promise<{ items: Record<nu
 }
 
 export { toOPGGChampName as _toOPGG, RUNE_PATH_NAMES as _RUNE_PATHS };
+
+
+// ── Re-ranking de picks con IA ───────────────────────────────────────────────
+// La lista determinista (meta + matchups + tu pool + comp) ya es buena; la IA
+// solo reordena los 3 mejores y explica por qué, viendo el draft completo. Si
+// no hay proveedor rápido (Claude o un Ollama local), se devuelve null y la UI
+// se queda con el orden estadístico. Nunca se usa el backend: tarda minutos.
+export interface PickRerankRequest {
+  position: string;
+  allies: string[];
+  enemies: string[];
+  rival?: string;
+  missing: string[];
+  candidates: Array<{ name: string; winRate: number | null; tier: number | null; matchupWinRate: number | null; goodInto: string[]; badInto: string[]; covers: string[]; myWinRate: number | null; myGames: number }>;
+}
+export interface PickRerank { order: Array<{ name: string; why: string }>; provider: 'claude' | 'ollama'; model: string; tookMs: number }
+
+const PICK_SYSTEM = `Eres ATAK Coach, analista de drafts de League of Legends. Hablas español neutro, directo.
+Te dan el draft actual y una lista de CANDIDATOS con datos reales (winrate del meta, winrate del duelo contra el rival, contra quién gana/pierde del equipo enemigo, qué hueco de composición cubre y el historial del propio jugador).
+Elige los 3 mejores picks para GANAR ESTA partida, en orden. Prioriza: 1) duelo de línea y matchups contra lo ya elegido, 2) lo que el jugador domina, 3) huecos de la comp (daño AP/AD, frontline, engage), 4) meta.
+Solo puedes elegir nombres de la lista de candidatos. Responde ÚNICAMENTE un JSON: {"picks":[{"name":"...","why":"máx 12 palabras"}]}`;
+
+export async function rerankPicks(req: PickRerankRequest, timeoutMs = 9000): Promise<PickRerank | null> {
+  const t0 = Date.now();
+  const cands = (req.candidates || []).slice(0, 8);
+  if (cands.length < 2) return null;
+  const line = (c: PickRerankRequest['candidates'][number]) => {
+    const bits = [`meta ${c.winRate ?? '?'}%${c.tier != null ? ` T${c.tier}` : ''}`];
+    if (c.matchupWinRate != null && req.rival) bits.push(`${c.matchupWinRate}% vs ${req.rival}`);
+    if (c.goodInto.length) bits.push(`gana a ${c.goodInto.join('/')}`);
+    if (c.badInto.length) bits.push(`pierde con ${c.badInto.join('/')}`);
+    if (c.covers.length) bits.push(`cubre ${c.covers.join('+')}`);
+    if (c.myWinRate != null) bits.push(`jugador ${c.myWinRate}% en ${c.myGames} partidas`);
+    return `- ${c.name}: ${bits.join(', ')}`;
+  };
+  const user = [
+    `Rol: ${req.position}. Aliados: ${req.allies.join(', ') || 'ninguno aún'}. Enemigos: ${req.enemies.join(', ') || 'ninguno aún'}. Rival de línea: ${req.rival || 'desconocido'}.`,
+    `Huecos de la comp: ${req.missing.join(', ') || 'ninguno'}.`,
+    'Candidatos:', ...cands.map(line),
+  ].join('\n');
+  let raw = ''; let provider: PickRerank['provider'] = 'claude'; let model = '';
+  try {
+    if (cfg.anthropicKey) { raw = await askClaude(PICK_SYSTEM, user, timeoutMs); model = cfg.claudeModel; }
+    else {
+      const m = (await ollamaHasModel(cfg.ollamaModel)) ? cfg.ollamaModel : (await ollamaHasModel(cfg.ollamaFallback)) ? cfg.ollamaFallback : '';
+      if (!m) return null;
+      provider = 'ollama'; model = m;
+      raw = await askOllama(m, PICK_SYSTEM, user, timeoutMs);
+    }
+  } catch (e: any) { console.warn('[draft-ai] rerank falló:', e?.message); return null; }
+  const j = extractJson(raw);
+  const allowed = new Map(cands.map((c) => [c.name.toLowerCase().replace(/[^a-z0-9]/g, ''), c.name]));
+  const order: Array<{ name: string; why: string }> = [];
+  for (const p of (Array.isArray(j?.picks) ? j.picks : [])) {
+    const name = allowed.get(String(p?.name || '').toLowerCase().replace(/[^a-z0-9]/g, ''));
+    if (name && !order.some((o) => o.name === name)) order.push({ name, why: String(p?.why || '').slice(0, 120) });
+    if (order.length >= 3) break;
+  }
+  return order.length ? { order, provider, model, tookMs: Date.now() - t0 } : null;
+}

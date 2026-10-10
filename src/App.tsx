@@ -85,7 +85,16 @@ declare global {
         goodInto: string[];
         badInto: string[];
         covers: string[];
+        myWinRate: number | null;
+        myGames: number;
+        myMastery: number;
+        aiRank?: number;
+        aiReason?: string;
       }>>;
+      pickAiRerank: (req: {
+        position: string; allies: string[]; enemies: string[]; rival?: string; missing: string[];
+        candidates: Array<{ name: string; winRate: number | null; tier: number | null; matchupWinRate: number | null; goodInto: string[]; badInto: string[]; covers: string[]; myWinRate: number | null; myGames: number }>;
+      }) => Promise<{ order: Array<{ name: string; why: string }>; provider: string; model: string; tookMs: number } | null>;
       togglePlayers: () => Promise<{ ok: boolean; open: boolean }>;
       toggleOverlay: (kind: 'hud' | 'scoreboard' | 'players' | 'champselect') => Promise<{ ok: boolean }>;
       replaysStatus: () => Promise<ReplayStatus>;

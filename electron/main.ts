@@ -15,7 +15,7 @@ import { uIOhook, UiohookKey } from 'uiohook-napi';
 import electronUpdater from 'electron-updater';
 const { autoUpdater } = electronUpdater;
 import path from 'node:path';
-import { writeFile } from 'node:fs';
+import { writeFile, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { LcuService } from './services/lcu.js';
 import { LiveClientService, computeObjectives } from './services/live-client.js';
@@ -23,7 +23,7 @@ import { FeedPusher, type FeedConfig } from './services/feed-push.js';
 import { ReplayFetcher } from './services/replay-fetcher.js';
 import { getPatchData } from './services/patch.js';
 import { AugmentDetector, CARD_GEOM, CARD_GEOM_ARENA } from './services/augment-detector.js';
-import { analyzeDraft, draftAiNames, type DraftRequest } from './services/draft-ai.js';
+import { analyzeDraft, draftAiNames, type DraftRequest, rerankPicks, configureDraftAi, type PickRerankRequest } from './services/draft-ai.js';
 import {
   fetchRosterOpgg,
   getChampionBuild,
@@ -33,11 +33,21 @@ import {
   getAramAugmentBoard,
   RUNE_PATH_NAMES,
   type OpggGameMode,
+  getSummonerFullProfile,
+  type ChampPool,
 } from './services/opgg.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEV_URL = process.env.VITE_DEV_SERVER_URL; // lo inyecta vite-plugin-electron en dev
 const BACKEND = process.env.ATAK_BACKEND || 'https://atakback.revolution505.com';
+// IA del draft configurable sin variables de entorno: <userData>/ai.json
+// { "anthropicApiKey": "...", "claudeModel": "...", "ollamaUrl": "...", "ollamaModel": "..." }
+try {
+  const raw = readFileSync(path.join(app.getPath('userData'), 'ai.json'), 'utf8');
+  const j = JSON.parse(raw) || {};
+  configureDraftAi({ anthropicKey: j.anthropicApiKey, claudeModel: j.claudeModel, ollamaUrl: j.ollamaUrl, ollamaModel: j.ollamaModel });
+  console.log('[draft-ai] ai.json cargado');
+} catch { /* sin ai.json: variables de entorno o Ollama local */ }
 const FRONTEND = process.env.ATAK_FRONTEND || 'https://atakgg.revolution505.com';
 
 const lcu = new LcuService();
@@ -406,6 +416,14 @@ lcu.on('champ-select-update', (state) => {
         }
       }
     }
+    // Mi acción de pick: la UI decide con esto si puede auto-hover / auto-lock.
+    const myPick = { pending: false, inProgress: false, locked: false };
+    for (const group of (state.session?.actions || []) as any[][]) {
+      for (const a of group || []) {
+        if (Number(a?.actorCellId) !== Number(state.session?.localPlayerCellId) || String(a?.type) !== 'pick') continue;
+        if (a?.completed) myPick.locked = true; else { myPick.pending = true; if (a?.isInProgress) myPick.inProgress = true; }
+      }
+    }
     const mapPick = (p: any) => {
       const championId = Number(p.championId || p.championPickIntent || 0) || 0;
       const meta = championId && patch ? patch.champById[championId] : null;
@@ -430,6 +448,7 @@ lcu.on('champ-select-update', (state) => {
     broadcast('champ-select', {
       phase: state.phase,
       actionType: currentActionType,
+      myPick,
       timerSecs: state.timerSecs,
       localPlayerChampionId: state.localPlayerChampionId,
       localPlayerPosition: state.localPlayerPosition,
@@ -448,6 +467,30 @@ lcu.on('champ-select-update', (state) => {
     });
   })();
 });
+// Tu pool (OP.GG: partidas/victorias de la temporada) se calienta al entrar al
+// champ select para que las sugerencias ya lo tengan en la fase de picks.
+let myPoolCache: { key: string; at: number; pool: Promise<ChampPool> } | null = null;
+function myPool(): Promise<ChampPool> {
+  const me = lcu.summoner;
+  const key = me ? `${me.gameName}#${me.tagLine}@${lcu.region || 'LA1'}` : '';
+  if (!key) return Promise.resolve({});
+  if (myPoolCache && myPoolCache.key === key && Date.now() - myPoolCache.at < 60 * 60_000) return myPoolCache.pool;
+  const pool = (async () => {
+    const out: ChampPool = {};
+    try {
+      const prof = await getSummonerFullProfile(me!.gameName, me!.tagLine, lcu.region || 'LA1');
+      for (const c of prof?.champion_stats || []) {
+        const k = String(c.champion_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (k) out[k] = { play: Number(c.play) || 0, win: Number(c.win) || 0 };
+      }
+    } catch (e: any) { console.warn('[picks] pool OP.GG', e?.message); }
+    return out;
+  })();
+  myPoolCache = { key, at: Date.now(), pool };
+  return pool;
+}
+lcu.on('champ-select-started', () => { void myPool(); });
+
 // Cierre forzado al terminar/dodge champ select (además de handlePhase).
 lcu.on('champ-select-ended', () => {
   cellInfoCache.clear();
@@ -776,7 +819,7 @@ live.on('state', (state) => {
     dumpRawForDebug(state);
   } else {
     // Jugador de torneo: aporta la partida al overlay del stream (el backend decide si lo es).
-    void feed.pushAuto(state, BACKEND).then(() => broadcast('autofeed-status', autofeedStatus()));
+    void feed.pushAuto(state, BACKEND, lcu.currentIsCustom).then(() => broadcast('autofeed-status', autofeedStatus()));
   }
 });
 
@@ -1036,6 +1079,28 @@ ipcMain.handle('opgg-pick-suggestions', async (_e, payload: any) => {
       }
     } catch { /* sin patch: scoring solo por meta */ }
 
+    // Tu pool: temporada (OP.GG) + maestría (LCU, ya cacheada por celda).
+    const pool: ChampPool = { ...(await Promise.race([myPool(), new Promise<ChampPool>((r) => setTimeout(() => r({}), 2500))])) };
+    try {
+      const puuid = lcu.summoner?.puuid || '';
+      const info = puuid ? await Promise.race([cellInfoCache.get(puuid) || Promise.resolve(null), new Promise<null>((r) => setTimeout(() => r(null), 800))]) : null;
+      const { champById } = await getPatchData();
+      for (const [id, m] of Object.entries(info?.masteryByChamp || {})) {
+        const k = String((champById as any)[id]?.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (!k) continue;
+        pool[k] = { ...(pool[k] || { play: 0, win: 0 }), mastery: Number((m as any)?.points) || 0 };
+      }
+    } catch { /* sin maestría */ }
+    // Solo campeones que puedes elegir (propios + rotación): el hover de otro falla.
+    let pickable: Set<string> | null = null;
+    try {
+      const ids = await lcu.pickableChampionIds();
+      if (ids.length) {
+        const { champById } = await getPatchData();
+        pickable = new Set(ids.map((id) => String((champById as any)[id]?.name || '').toLowerCase().replace(/[^a-z0-9]/g, '')).filter(Boolean));
+      }
+    } catch { /* sin filtro */ }
+
     return await getPickSuggestions({
       position: String(payload?.position || 'MIDDLE'),
       missingRoles: Array.isArray(payload?.missingRoles) ? payload.missingRoles.map(String) : [],
@@ -1046,11 +1111,18 @@ ipcMain.handle('opgg-pick-suggestions', async (_e, payload: any) => {
       enemyNames: Array.isArray(payload?.enemyNames) ? payload.enemyNames.map(String) : [],
       rivalName: String(payload?.rivalName || ''),
       deep: payload?.deep !== false,
+      pool,
+      pickable,
     });
   } catch (e: any) {
     console.warn('[opgg] pick-suggestions', e?.message);
     return [];
   }
+});
+
+// IA sobre los candidatos ya puntuados (solo Claude u Ollama local; ver draft-ai.ts).
+ipcMain.handle('pick-ai-rerank', async (_e, req: PickRerankRequest) => {
+  try { return await rerankPicks(req); } catch (e: any) { console.warn('[picks] rerank', e?.message); return null; }
 });
 
 function raisePlayersWindow(win: BrowserWindow) {
