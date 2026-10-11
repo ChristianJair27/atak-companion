@@ -226,13 +226,16 @@ export default function ChampSelectView() {
   // Auto-hover: el companion deja en hover el mejor pick y lo cambia cuando el draft
   // cambia (counter del rival, huecos de comp). Auto-lock: confirma cuando quedan
   // pocos segundos de TU turno. Se apagan en cuanto eliges a mano otro campeón.
-  const [autoHover, setAutoHover] = useState<boolean>(() => { try { return localStorage.getItem('atak.cs.autohover') !== '0'; } catch { return true; } });
+  // Apagado por defecto: el companion nunca toca tu pick si no lo pides (botón Auto-hover).
+  const [autoHover, setAutoHover] = useState<boolean>(() => { try { return localStorage.getItem('atak.cs.autohover') === '1'; } catch { return false; } });
   const [autoLock, setAutoLock] = useState<boolean>(() => { try { return localStorage.getItem('atak.cs.autolock') === '1'; } catch { return false; } });
   const autoHoveredRef = useRef<string>('');
   const manualRef = useRef(false);
   const lastAutoAtRef = useRef(0);
   const lockedRef = useRef(false);
   useEffect(() => { try { localStorage.setItem('atak.cs.autohover', autoHover ? '1' : '0'); } catch { /* */ } if (autoHover) manualRef.current = false; }, [autoHover]);
+  // Migración 0.4.5→0.4.7: a quien no lo activó a mano se le apaga (antes venía encendido).
+  useEffect(() => { try { if (localStorage.getItem('atak.cs.autohover.optin') !== '1') { localStorage.setItem('atak.cs.autohover', '0'); localStorage.setItem('atak.cs.autohover.optin', '1'); setAutoHover(false); } } catch { /* */ } }, []);
   useEffect(() => { try { localStorage.setItem('atak.cs.autolock', autoLock ? '1' : '0'); } catch { /* */ } }, [autoLock]);
   const [suggLoading, setSuggLoading] = useState(false);
   const [refining, setRefining] = useState(false);
@@ -652,7 +655,7 @@ export default function ChampSelectView() {
                         {refining && <span className="hx-faint" style={{ marginLeft: 8, fontWeight: 500 }}>· afinando con el matchup…</span>}
                       </span>
                       <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <button type="button" className={`hx-pill${autoHover ? ' ok' : ''}`} onClick={() => setAutoHover((v) => !v)} title="Deja en hover el mejor pick y lo cambia con el draft. Si eliges otro a mano, se detiene.">Auto-hover {autoHover ? 'ON' : 'OFF'}</button>
+                        <button type="button" className={`hx-pill${autoHover ? ' ok' : ''}`} onClick={() => setAutoHover((v) => !v)} title="Apagado: solo cambia tu pick si haces clic en una sugerencia. Encendido: deja en hover el mejor pick y lo cambia con el draft (si eliges otro a mano, se detiene).">Auto-hover {autoHover ? 'ON' : 'OFF'}</button>
                         <button type="button" className={`hx-pill${autoLock ? ' ok' : ''}`} onClick={() => setAutoLock((v) => !v)} title="Confirma el pick cuando quedan 4 s de tu turno (solo si sigue en hover el recomendado).">Auto-lock {autoLock ? 'ON' : 'OFF'}</button>
                         {aiInfo && <span className="hx-pill" title={`${aiInfo.provider} · ${aiInfo.model}`}>IA</span>}
                       </span>

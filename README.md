@@ -24,7 +24,7 @@ La app se actualiza sola cuando publicamos una versión nueva. ¿Algo falla? Abr
 - **Runas en un clic**: crea la página recomendada en tu cliente y la deja activa (reutiliza siempre la misma página "ATAK", nunca borra las tuyas).
 - Timer por fase, bans, comp analysis y tip escrito del matchup.
 
-**Auto-pick (0.4.5).** En la pestaña *Sugerencias de pick* hay dos interruptores: **Auto-hover** deja en hover el mejor pick y lo cambia solo cuando el draft cambia (counter del rival, huecos de la comp); si eliges otro campeón a mano, se detiene. **Auto-lock** confirma el pick cuando quedan 4 s de tu turno (solo si sigue en hover el recomendado; apagado por defecto). Las sugerencias ya cuentan con tu pool (winrate y partidas de la temporada en OP.GG, maestría) y solo proponen campeones que puedes elegir.
+**Auto-pick (0.4.5).** En la pestaña *Sugerencias de pick* hay dos interruptores: **Auto-hover** (apagado por defecto) deja en hover el mejor pick y lo cambia solo cuando el draft cambia (counter del rival, huecos de la comp); si eliges otro campeón a mano, se detiene. Apagado, el companion no toca tu pick: solo cambia al hacer clic en una sugerencia. **Auto-lock** confirma el pick cuando quedan 4 s de tu turno (solo si sigue en hover el recomendado; apagado por defecto). Las sugerencias ya cuentan con tu pool (winrate y partidas de la temporada en OP.GG, maestría) y solo proponen campeones que puedes elegir.
 
 **IA del draft sin variables de entorno.** Crea `%APPDATA%tak-companioni.json`:
 
