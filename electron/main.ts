@@ -23,7 +23,7 @@ import { FeedPusher, type FeedConfig } from './services/feed-push.js';
 import { ReplayFetcher } from './services/replay-fetcher.js';
 import { getPatchData } from './services/patch.js';
 import { AugmentDetector, CARD_GEOM, CARD_GEOM_ARENA } from './services/augment-detector.js';
-import { analyzeDraft, draftAiNames, type DraftRequest, rerankPicks, configureDraftAi, type PickRerankRequest } from './services/draft-ai.js';
+import { analyzeDraft, draftAiNames, type DraftRequest, rerankPicks, configureDraftAi, type PickRerankRequest, adjustRunesForDraft, getRuneCatalog } from './services/draft-ai.js';
 import {
   fetchRosterOpgg,
   getChampionBuild,
@@ -45,7 +45,7 @@ const BACKEND = process.env.ATAK_BACKEND || 'https://atakback.revolution505.com'
 try {
   const raw = readFileSync(path.join(app.getPath('userData'), 'ai.json'), 'utf8');
   const j = JSON.parse(raw) || {};
-  configureDraftAi({ anthropicKey: j.anthropicApiKey, claudeModel: j.claudeModel, ollamaUrl: j.ollamaUrl, ollamaModel: j.ollamaModel });
+  configureDraftAi({ anthropicKey: j.anthropicApiKey, claudeModel: j.claudeModel, ollamaUrl: j.ollamaUrl, ollamaModel: j.ollamaModel, allowLocal: j.allowLocal === true });
   console.log('[draft-ai] ai.json cargado');
 } catch { /* sin ai.json: variables de entorno o Ollama local */ }
 const FRONTEND = process.env.ATAK_FRONTEND || 'https://atakgg.revolution505.com';
@@ -114,9 +114,10 @@ function makeOverlayWindow(
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      // Overlays sobre el juego: Chromium los cree "ocultos" y congela rAF → las
-      // animaciones (framer) se quedaban a medias (vista oscura/borrosa).
-      backgroundThrottling: false,
+      // Solo los overlays clavados sobre el juego (HUD/caster) necesitan seguir
+      // animando aunque Chromium los crea "ocultos". El resto se acelera cuando
+      // está detrás del juego: menos CPU/GPU en partida.
+      backgroundThrottling: !pin,
     },
   });
   if (pin) {
@@ -145,7 +146,8 @@ function ensure(kind: WinKind): BrowserWindow {
           preload: path.join(__dirname, 'preload.cjs'),
           contextIsolation: true,
           nodeIntegration: false,
-          backgroundThrottling: false,
+          // La ventana principal (con el sitio embebido) se acelera detrás del juego.
+          backgroundThrottling: true,
           // Pestaña "ATAK.GG": el frontend real embebido en un <webview>
           // (proceso aislado, sin acceso a window.atak).
           webviewTag: true,
@@ -445,7 +447,7 @@ lcu.on('champ-select-update', (state) => {
     };
     const myBans = (state.session?.bans?.myTeamBans || []).map(Number).filter(Boolean);
     const theirBans = (state.session?.bans?.theirTeamBans || []).map(Number).filter(Boolean);
-    broadcast('champ-select', {
+    const csPayload = {
       phase: state.phase,
       actionType: currentActionType,
       myPick,
@@ -464,9 +466,13 @@ lcu.on('champ-select-update', (state) => {
           name: patch?.champById[id]?.name || '',
         })),
       },
-    });
+    };
+    lastChampSelect = csPayload;
+    broadcast('champ-select', csPayload);
   })();
 });
+/** Último champ select mapeado (equipos con tags): lo usa el ajuste de runas al draft. */
+let lastChampSelect: { team: any[]; enemy: any[] } | null = null;
 // Tu pool (OP.GG: partidas/victorias de la temporada) se calienta al entrar al
 // champ select para que las sugerencias ya lo tengan en la fase de picks.
 let myPoolCache: { key: string; at: number; pool: Promise<ChampPool> } | null = null;
@@ -494,6 +500,7 @@ lcu.on('champ-select-started', () => { void myPool(); });
 // Cierre forzado al terminar/dodge champ select (además de handlePhase).
 lcu.on('champ-select-ended', () => {
   cellInfoCache.clear();
+  lastChampSelect = null;
   broadcast('champ-select-ended');
   closeWin('champselect');
 });
@@ -508,7 +515,7 @@ async function emitChampionBuild(
 ) {
   // Preferencia: OP.GG MCP directo (runas/items/counters). Fallback: backend ATAK.
   try {
-    const { champById, runeIconById } = await getPatchData();
+    const { champById, runeIconById, version } = await getPatchData();
     const champ = champById[championId];
     if (!champ) return;
     broadcast('champion-build-loading', { championId, name: champ.name, preview, rival: rivalName });
@@ -563,7 +570,7 @@ async function emitChampionBuild(
       const set = (s: { ids: number[]; names: string[] } | undefined) =>
         (s?.ids || []).map((id, i) => ({ id, name: s?.names?.[i] || '' }));
 
-      const runes = useMatchup && mRunes
+      let runes: any = useMatchup && mRunes
         ? {
             primaryPath: RUNE_PATH_NAMES[mRunes.primaryPathId] || mRunes.primaryPathName,
             secondaryPath: RUNE_PATH_NAMES[mRunes.secondaryPathId] || mRunes.secondaryPathName,
@@ -605,6 +612,28 @@ async function emitChampionBuild(
             boots: opgg?.boots_id ? [{ id: opgg.boots_id, name: opgg.boots_name || '' }] : [],
           };
 
+      // Ajuste al draft (reglas): runas menores y fragmentos según la comp enemiga.
+      // Keystone y ramas se respetan; cada cambio lleva su razón (chips en la UI).
+      if (runes && mode === 'ranked' && lastChampSelect) {
+        try {
+          const cat = await getRuneCatalog(version);
+          const enemies = (lastChampSelect.enemy || []).filter((p: any) => p.championName).map((p: any) => ({ name: String(p.championName), tags: Array.isArray(p.tags) ? p.tags : [], pos: String(p.position || '') }));
+          const rivalP = rivalName ? enemies.find((e: any) => e.name.toLowerCase() === rivalName.toLowerCase()) || null : null;
+          const adj = adjustRunesForDraft(
+            { primary: runes.primaryPathId, secondary: runes.secondaryPathId, ids: runes.rune_ids.slice(0, 6), shards: runes.rune_ids.slice(6, 9) },
+            { meTags: champ.tags || [], enemies, rival: rivalP }, cat,
+          );
+          if (adj.adjustments.length) {
+            const entry = (id: number) => runeEntry(id, cat.runes[id]?.name);
+            runes = {
+              ...runes,
+              keystone: entry(adj.ids[0]), primary: adj.ids.slice(1, 4).map(entry), secondary: adj.ids.slice(4, 6).map(entry), shards: adj.shards.map((id) => runeEntry(id)),
+              rune_ids: [...adj.ids, ...adj.shards],
+              adjustments: adj.adjustments.map((a) => ({ ...a, fromName: cat.runes[a.from]?.name || String(a.from), toName: cat.runes[a.to]?.name || String(a.to) })),
+            };
+          }
+        } catch (e: any) { console.warn('[runes] ajuste al draft', e?.message); }
+      }
       // Página lista para mandar al cliente de un click (9 runas exactas).
       const perkIds: number[] = runes?.rune_ids?.slice(0, 9) ?? [];
       const runePage =

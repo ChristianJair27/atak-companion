@@ -689,10 +689,20 @@ export default function ChampSelectView() {
                   {runes && (
                     <HxPanel corners>
                       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
-                        <span className="hx-label head">{mu?.source === 'matchup' ? `Runas vs ${String(mu.rival)}` : 'Runas'} <span className="hx-faint" style={{ fontFamily: 'var(--hx-data)', fontSize: 12, fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>· estadística OP.GG</span></span>
+                        <span className="hx-label head">{mu?.source === 'matchup' ? `Runas vs ${String(mu.rival)}` : 'Runas'} <span className="hx-faint" style={{ fontFamily: 'var(--hx-data)', fontSize: 12, fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>· estadística OP.GG{Array.isArray(runes?.adjustments) && runes.adjustments.length > 0 ? ' · ajustadas al draft' : ''}</span></span>
                         {mu && <span className="hx-muted" style={{ fontSize: 12 }}>{mu.source === 'matchup' ? `${mu.runesPlay} partidas del duelo${mu.runesWinRate != null ? ` · ${mu.runesWinRate}% WR` : ''}` : `sin muestra vs ${mu.rival} · meta de línea`}</span>}
                       </div>
                       <HxRuneTree patch={patch} primaryPathId={Number(runes.primaryPathId) || 0} secondaryPathId={Number(runes.secondaryPathId) || 0} selected={runeIds.slice(0, 6)} shards={runeIds.slice(6, 9)} />
+                      {Array.isArray(runes?.adjustments) && runes.adjustments.length > 0 && (
+                        <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                          <span className="hx-pill" style={{ ['--c' as any]: 'var(--hx-green)' }}>Ajustes por el draft</span>
+                          {runes.adjustments.map((a: any, i: number) => (
+                            <span key={i} className="hx-pill" title={a.reason} style={{ textTransform: 'none' }}>
+                              {a.toName} <span className="hx-faint">← {a.fromName}</span> <span className="hx-faint">· {a.reason}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       {mu?.tip && <div className="cs-note hot" style={{ marginTop: 10 }}><b>VS {String(mu.rival).toUpperCase()} (EN)</b>{mu.tip}</div>}
                     </HxPanel>
                   )}

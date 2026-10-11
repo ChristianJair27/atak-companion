@@ -56,7 +56,7 @@ const SHARDS: Record<number, string> = {
   5002: 'Armadura', 5003: 'Resistencia mágica',
 };
 
-async function getRuneCatalog(version: string): Promise<RuneCat> {
+export async function getRuneCatalog(version: string): Promise<RuneCat> {
   if (runeCat?.ver === version) return runeCat.data;
   const res = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/es_MX/runesReforged.json`);
   const arr: any[] = res.ok ? ((await res.json()) as any[]) : [];
@@ -113,6 +113,9 @@ const DMG_TAGS = (tags: string[]) => {
 // Configurable sin variables de entorno: main carga <userData>/ai.json
 // ({ "anthropicApiKey", "claudeModel", "ollamaUrl", "ollamaModel" }) y llama a configureDraftAi.
 const cfg = {
+  // Ollama local SOLO si el usuario lo pide (ai.json allowLocal / ATAK_LOCAL_AI=1):
+  // correr un modelo en el PC del jugador durante la partida le tira los FPS.
+  allowLocal: process.env.ATAK_LOCAL_AI === '1',
   anthropicKey: process.env.ANTHROPIC_API_KEY || '',
   claudeModel: process.env.ATAK_CLAUDE_MODEL || 'claude-sonnet-5-5',
   ollamaUrl: (process.env.OLLAMA_URL || 'http://localhost:11434/api/chat').replace(/\/$/, ''),
@@ -120,9 +123,12 @@ const cfg = {
   ollamaFallback: process.env.OLLAMA_MODEL || 'llama3.1:8b',
 };
 export function configureDraftAi(o: Partial<typeof cfg>) {
-  for (const [k, v] of Object.entries(o)) if (typeof v === 'string' && v.trim()) (cfg as any)[k] = k === 'ollamaUrl' ? v.trim().replace(/\/$/, '') : v.trim();
+  for (const [k, v] of Object.entries(o)) {
+    if (typeof v === 'boolean') (cfg as any)[k] = v;
+    else if (typeof v === 'string' && v.trim()) (cfg as any)[k] = k === 'ollamaUrl' ? v.trim().replace(/\/$/, '') : v.trim();
+  }
 }
-export function draftAiProvider(): string { return cfg.anthropicKey ? `claude (${cfg.claudeModel})` : `ollama local (${cfg.ollamaModel})`; }
+export function draftAiProvider(): string { return cfg.anthropicKey ? `claude (${cfg.claudeModel})` : cfg.allowLocal ? `ollama local (${cfg.ollamaModel})` : 'ATAK (hosteada)'; }
 const BACKEND = (process.env.ATAK_BACKEND || 'https://atakback.revolution505.com').replace(/\/$/, '');
 
 async function askBackend(system: string, user: string, timeoutMs: number): Promise<{ content: string; model: string }> {
@@ -285,12 +291,13 @@ export async function analyzeDraft(req: DraftRequest): Promise<DraftAnalysis> {
       dmg.ap >= 3 ? 'El enemigo es mayormente AP: prioriza resistencia mágica en tu 3er/4º item.' : dmg.ad >= 3 ? 'El enemigo es mayormente AD: armadura o Zhonya tras tu core.' : 'Daño enemigo mixto: termina el core antes de defensivos.',
       dmg.tank >= 2 ? 'Dos o más tanques: penetración porcentual temprano.' : 'Equipo enemigo blando: busca burst y daño plano.',
     ];
+    const adjusted = basePage ? adjustRunesForDraft(basePage, { meTags: tagsOf(req.me), enemies: enemyProfile.map((e) => ({ name: e.name, tags: e.tags, pos: e.pos })), rival: req.rival ? (enemyProfile.find((e) => e.name.toLowerCase() === String(req.rival).toLowerCase()) || null) : null }, runes) : null;
     return finish({
       provider: 'rules', model: 'reglas + OP.GG',
       resumen: matchup?.tip ? `Matchup vs ${req.rival}: ${matchup.tip}` : `Build de línea de ${me} en ${pos} ajustada a la comp enemiga (${dmg.ad} AD · ${dmg.ap} AP · ${dmg.tank} tanques).`,
       plan,
       amenazas: enemyProfile.slice(0, 2).map((e) => ({ champion: e.name, porQue: DMG_TAGS(e.tags).ap ? 'Burst mágico' : 'Daño físico' })),
-      runas: basePage ? { primaryPathId: basePage.primary, secondaryPathId: basePage.secondary, ids: basePage.ids, shards: basePage.shards, razon: `Página ${basePage.source}.`, source: basePage.source } : { primaryPathId: 0, secondaryPathId: 0, ids: [], shards: [], razon: 'Sin datos de runas', source: 'none' },
+      runas: basePage ? { primaryPathId: basePage.primary, secondaryPathId: basePage.secondary, ids: adjusted?.ids || basePage.ids, shards: adjusted?.shards || basePage.shards, razon: adjusted?.adjustments.length ? `Página ${basePage.source}, ajustada al draft: ${adjusted.adjustments.map((a) => `${runes.runes[a.to]?.name || a.to} (${a.reason})`).join('; ')}.` : `Página ${basePage.source}.`, source: basePage.source } : { primaryPathId: 0, secondaryPathId: 0, ids: [], shards: [], razon: 'Sin datos de runas', source: 'none' },
       items: { inicio: (build?.starter_ids || []).slice(0, 3), build: buildIds, situacionales: sit.filter((x) => !buildIds.includes(x.id)), razon: 'Build estadística del matchup con defensivos según la comp enemiga.' },
       hechizos: (matchup?.spells?.[0]?.ids?.length ? matchup!.spells[0].ids : build?.spell_ids || [4, 14]).slice(0, 2),
       confianza: 0.5,
@@ -367,7 +374,7 @@ Devuelve SOLO este JSON${compact ? ' (breve: resumen de 1 frase, 3 puntos de pla
     } catch (e: any) { console.warn(`[draft-ai] ${name} falló:`, e?.message); }
     return false;
   };
-  const hasLocalOllama = !cfg.anthropicKey && (await ollamaHasModel(cfg.ollamaModel).catch(() => false) || await ollamaHasModel(cfg.ollamaFallback).catch(() => false));
+  const hasLocalOllama = cfg.allowLocal && !cfg.anthropicKey && (await ollamaHasModel(cfg.ollamaModel).catch(() => false) || await ollamaHasModel(cfg.ollamaFallback).catch(() => false));
   const done =
     (cfg.anthropicKey && await tryProvider('claude', async () => ({ content: await askClaude(SYSTEM_PROMPT, user, 45_000), model: cfg.claudeModel })))
     || (hasLocalOllama && await tryProvider('ollama', async () => {
@@ -489,6 +496,7 @@ export async function rerankPicks(req: PickRerankRequest, timeoutMs = 9000): Pro
   try {
     if (cfg.anthropicKey) { raw = await askClaude(PICK_SYSTEM, user, timeoutMs); model = cfg.claudeModel; }
     else {
+      if (!cfg.allowLocal) return null;
       const m = (await ollamaHasModel(cfg.ollamaModel)) ? cfg.ollamaModel : (await ollamaHasModel(cfg.ollamaFallback)) ? cfg.ollamaFallback : '';
       if (!m) return null;
       provider = 'ollama'; model = m;
@@ -504,4 +512,95 @@ export async function rerankPicks(req: PickRerankRequest, timeoutMs = 9000): Pro
     if (order.length >= 3) break;
   }
   return order.length ? { order, provider, model, tookMs: Date.now() - t0 } : null;
+}
+
+
+// ── Runas ajustadas al draft (reglas, sin IA) ────────────────────────────────
+// Parte de la página estadística (matchup u OP.GG general) y cambia SOLO runas
+// menores y fragmentos según la comp enemiga; keystone y ramas se respetan
+// (ahí la estadística manda). Cada cambio lleva su razón para mostrarla.
+export interface RuneAdjustment { from: number; to: number; slot: number; reason: string }
+export interface DraftCtx { meTags: string[]; enemies: Array<{ name: string; tags: string[]; pos?: string }>; rival?: { name: string; tags: string[] } | null }
+
+// Ids de runas (estables desde 2018; las filas se validan contra el catálogo DDragon).
+const R = {
+  // Valor
+  secondWind: 8444, bonePlating: 8473, conditioning: 8429, unflinching: 8242, overgrowth: 8451, revitalize: 8453,
+  // Precisión
+  coupDeGrace: 8014, cutDown: 8017, lastStand: 8299, legendAlacrity: 9104, legendHaste: 9105,
+  // Dominación
+  tasteOfBlood: 8139, suddenImpact: 8143, cheapShot: 8126,
+  // Brujería
+  scorch: 8237, gatheringStorm: 8236, nimbus: 8275, manaflow: 8226,
+  // Inspiración
+  biscuits: 8345, approachVelocity: 8410, cosmicInsight: 8347,
+};
+const SH = { adaptive: 5008, as: 5005, haste: 5007, ms: 5010, hpScale: 5001, hp: 5011, tenacity: 5013 };
+
+export function adjustRunesForDraft(
+  page: { primary: number; secondary: number; ids: number[]; shards: number[] },
+  ctx: DraftCtx,
+  cat: RuneCat,
+): { ids: number[]; shards: number[]; adjustments: RuneAdjustment[] } {
+  const ids = [...page.ids];
+  const shards = [...page.shards];
+  const adjustments: RuneAdjustment[] = [];
+  if (ids.length !== 6) return { ids, shards, adjustments };
+
+  const low = (t: string[]) => t.map((x) => x.toLowerCase());
+  const en = ctx.enemies.map((e) => ({ ...e, t: low(e.tags) }));
+  const me = low(ctx.meTags);
+  const meMelee = !me.includes('marksman') && !me.includes('mage');
+  const meTanky = me.includes('tank') || me.includes('fighter');
+  const n = (f: (t: string[]) => boolean) => en.filter((e) => f(e.t)).length;
+  const assassins = n((t) => t.includes('assassin'));
+  const mages = n((t) => t.includes('mage'));
+  const marksmen = n((t) => t.includes('marksman'));
+  const tanks = n((t) => t.includes('tank'));
+  const cc = n((t) => t.includes('tank') || t.includes('support'));
+  const burst = assassins + (mages >= 2 ? 1 : 0);
+  const squishy = tanks === 0 && en.length >= 4;
+  const rivalT = ctx.rival ? low(ctx.rival.tags) : [];
+  const rivalRanged = rivalT.includes('mage') || rivalT.includes('marksman');
+  const rivalBurst = rivalT.includes('assassin') || (rivalT.includes('mage') && !rivalT.includes('support'));
+  const names = (f: (t: string[]) => boolean) => en.filter((e) => f(e.t)).map((e) => e.name).slice(0, 3).join(', ');
+
+  // Cambia la runa de (rama, fila) por `to` si la página tiene esa casilla y no la lleva ya.
+  const swap = (to: number, reason: string) => {
+    const meta = cat.runes[to]; if (!meta) return;
+    const i = ids.findIndex((id) => cat.runes[id]?.pathId === meta.pathId && cat.runes[id]?.slot === meta.slot);
+    if (i < 0 || ids[i] === to) return;
+    // Las secundarias ocupan dos filas distintas: no dupliques fila.
+    if (i >= 4) { const other = ids[i === 4 ? 5 : 4]; if (cat.runes[other]?.slot === meta.slot) return; }
+    adjustments.push({ from: ids[i], to, slot: meta.slot, reason });
+    ids[i] = to;
+  };
+
+  // ── Valor, fila 2: Segundo Aliento / Placas de Hueso / Acondicionamiento ──
+  if (rivalRanged && meMelee) swap(R.secondWind, `poke de ${ctx.rival!.name} en línea`);
+  else if (rivalBurst || burst >= 2) swap(R.bonePlating, `burst enemigo (${names((t) => t.includes('assassin') || t.includes('mage')) || 'asesinos'})`);
+  else if (tanks >= 2 && meTanky) swap(R.conditioning, 'partida larga vs tanques: escala mejor');
+  // ── Valor, fila 3: Inquebrantable vs mucho CC ──
+  if (cc >= 3) swap(R.unflinching, `3+ fuentes de CC (${names((t) => t.includes('tank') || t.includes('support'))})`);
+  // ── Precisión, fila 3: Golpe de Gracia / Derribar / Última Batalla ──
+  if (tanks >= 2) swap(R.cutDown, `vs ${tanks} tanques`);
+  else if (squishy) swap(R.coupDeGrace, 'equipo enemigo blando');
+  else if (meTanky && burst >= 1) swap(R.lastStand, 'luchador que pelea con poca vida');
+  // ── Dominación, fila 1: Gusto por la Sangre en líneas de poke ──
+  if (rivalRanged && !me.includes('assassin')) swap(R.tasteOfBlood, `sostén vs el poke de ${ctx.rival!.name}`);
+  // ── Brujería, fila 3: Tormenta Creciente si va largo (tanques) / Quemadura si es blando ──
+  if (tanks >= 2 && ids.some((id) => cat.runes[id]?.pathId === 8200)) swap(R.gatheringStorm, 'comp enemiga tanque: la partida se alarga');
+  else if (squishy && (me.includes('mage') || me.includes('marksman'))) swap(R.scorch, 'rival blando: presión temprana');
+  // ── Inspiración, fila 2: Galletas en líneas de poke (sostén de maná/vida) ──
+  if (rivalRanged && meMelee) swap(R.biscuits, `aguantar el poke de ${ctx.rival!.name}`);
+
+  // ── Fragmentos (fila 3): tenacidad vs CC, vida plana vs burst, escalable vs tanques ──
+  if (shards.length === 3) {
+    const want = cc >= 3 ? SH.tenacity : burst >= 2 || rivalBurst ? SH.hp : tanks >= 2 ? SH.hpScale : 0;
+    if (want && shards[2] !== want) {
+      adjustments.push({ from: shards[2], to: want, slot: 8, reason: cc >= 3 ? 'tenacidad vs 3+ CC' : want === SH.hp ? 'vida plana vs burst temprano' : 'vida escalable vs comp tanque' });
+      shards[2] = want;
+    }
+  }
+  return { ids, shards, adjustments };
 }
