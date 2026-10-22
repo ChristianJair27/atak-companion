@@ -1,24 +1,22 @@
 // electron/services/hud-objectives.ts — lector del HUD del espectador.
 //
-// El cliente de League en modo espectador NO emite DragonKill/HordeKill/
-// HeraldKill/BaronKill por la Live Client API (comprobado con partidas enteras).
-// La barra superior del espectador sí los PINTA: iconos de dragón por tipo,
-// contador de larvas, heraldo y barón de cada equipo. Este servicio captura la
-// pantalla del caster cada pocos segundos (igual que el detector de augments de
-// Arena), lee esa barra por color y por cambio de píxeles, y emite eventos
-// equivalentes a los del Live Client. Sin leer memoria del juego, sin OCR
-// pesado: solo captura de pantalla, que Vanguard no toca.
+// El cliente de League en modo espectador NO emite DragonKill/HordeKill/BaronKill
+// por la Live Client API. La barra superior del espectador sí los pinta: por
+// equipo, de fuera hacia el centro, DRAGONES · BARÓN · LARVAS · TORRES · ORO, y
+// debajo de la barra una fila con el tipo de cada dragón tomado (los del lado
+// azul crecen hacia la izquierda desde el centro; los del rojo hacia la derecha).
+// Este servicio captura la pantalla cada segundo (igual que el detector de
+// augments de Arena), vigila los DÍGITOS de los contadores (píxeles del color del
+// equipo sobre el panel opaco) y, cuando uno cambia de forma estable, emite el
+// evento equivalente. El tipo de dragón se lee del icono nuevo de la fila
+// inferior: clase por tono (cálido / verde / cian / blanco) y, dentro de la clase,
+// la silueta más parecida a las plantillas medidas. Sin leer memoria del juego.
 //
-// Geometría: fracciones de pantalla (1920×1080 de referencia). Se puede
-// sobrescribir con <userData>/hud-geom.json sin recompilar, y "Guardar captura
-// del HUD" deja un PNG para calibrarla. Detección:
-//  - dragones: por casilla, saturación alta = icono presente; el tono (hue)
-//    decide el tipo (infernal/montaña/océano/nubes/hextech/químico); el anciano
-//    se reconoce por su brillo blanco-azul.
-//  - larvas: cuando el número cambia de forma estable (2 lecturas seguidas) se
-//    cuenta UNA larva más (solo suben).
-//  - heraldo/barón: icono que pasa de apagado a encendido = objetivo tomado.
-// Cada cambio debe repetirse en 2 capturas seguidas para descartar parpadeos.
+// Geometría y plantillas medidas sobre capturas reales del cliente (repeticiones
+// renderizadas del LQC, 1920×1080, escala de HUD por defecto) contrastadas con
+// la línea de tiempo oficial de Riot de esas partidas. Fracciones de pantalla
+// para que valga a 2560×1440. Se puede sobrescribir con <userData>/hud-geom.json;
+// "Guardar captura del HUD" deja un PNG para medir.
 import { desktopCapturer, screen, nativeImage } from 'electron';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
@@ -28,98 +26,140 @@ export type Side = 'blue' | 'red';
 export type DragonType = 'Fire' | 'Earth' | 'Water' | 'Air' | 'Hextech' | 'Chemtech' | 'Elder';
 export interface Box { x: number; y: number; w: number; h: number } // fracciones de pantalla
 export interface HudGeom {
-  /** Casillas de dragón de cada lado, de la más cercana al centro hacia afuera. */
-  dragons: Record<Side, Box[]>;
-  /** Número de larvas (el dígito junto al icono). */
-  grubs: Record<Side, Box>;
-  herald: Record<Side, Box>;
-  baron: Record<Side, Box>;
-  /** Umbral de saturación (0-1) para "hay icono". */
-  satOn: number;
+  /** Cajas de los dígitos de cada contador (sobre el panel opaco de la barra). */
+  counts: Record<Side, { dragons: Box; baron: Box; grubs: Box }>;
+  /** Centro (px a 1920×1080) de cada casilla de tipo de dragón, de dentro hacia afuera. */
+  dragonSlots: Record<Side, Array<{ cx: number; cy: number }>>;
+  /** IoU mínima entre máscaras de dígito para considerarlo el MISMO dígito. */
+  sameDigit: number;
 }
 
-// Medido sobre capturas del stream LQC a 1920×1080 (HUD del espectador por
-// defecto): fila de dragones a y≈72 px, azul de x≈773 hacia la izquierda del
-// centro y rojo espejado. Larvas/heraldo/barón van con la misma fila: se
-// afinan con la captura de calibración.
 const px = (x: number, y: number, w: number, h: number): Box => ({ x: x / 1920, y: y / 1080, w: w / 1920, h: h / 1080 });
 export const DEFAULT_GEOM: HudGeom = {
-  dragons: {
-    blue: [px(766, 64, 16, 16), px(785, 64, 16, 16), px(804, 64, 16, 16), px(823, 64, 16, 16)],
-    red: [px(1138, 64, 16, 16), px(1119, 64, 16, 16), px(1100, 64, 16, 16), px(1081, 64, 16, 16)],
+  counts: {
+    blue: { dragons: px(549, 58, 26, 26), baron: px(619, 58, 26, 26), grubs: px(683, 58, 26, 26) },
+    red: { grubs: px(1229, 58, 26, 26), baron: px(1300, 58, 26, 26), dragons: px(1373, 58, 26, 26) },
   },
-  grubs: { blue: px(730, 62, 22, 20), red: px(1168, 62, 22, 20) },
-  herald: { blue: px(700, 64, 16, 16), red: px(1204, 64, 16, 16) },
-  baron: { blue: px(670, 64, 16, 16), red: px(1234, 64, 16, 16) },
-  satOn: 0.35,
+  dragonSlots: {
+    blue: [870, 852, 834, 816, 798, 780].map((cx) => ({ cx, cy: 105 })),
+    red: [1060, 1078, 1096, 1114, 1132, 1150].map((cx) => ({ cx, cy: 105 })),
+  },
+  sameDigit: 0.6,
 };
 
-export interface HudState { dragons: Record<Side, DragonType[]>; grubs: Record<Side, number>; herald: Record<Side, boolean>; baron: Record<Side, number> }
-export interface HudEvent { name: 'DragonKill' | 'HordeKill' | 'HeraldKill' | 'BaronKill'; side: Side; extra: string; at: number }
+// Siluetas 15×15 (225 bits, fila a fila) de los iconos de tipo de dragón del HUD
+// (hextech y nubes: promedio de 5 y 3 muestras; el resto, una muestra cada uno).
+const TEMPLATE_HEX: Record<string, string> = {
+  Fire: '5fc0dfb3df65fed7fddffaf7fbd6ff7f7f777ffffffebef57ff9ff7',
+  Earth: 'c601f407f80fe837f93f45ffef5fdff5bfff7d3efbdd7fb977e97da',
+  Chemtech: '1ffffffffffff7ffffff7dfefbbffefdeffdec3f77ff5ffef3fef4fc2',
+  Hextech: '1be7d7b01ee97be6aee7fccbf1c7ffcefbdca9bca75c1c5c741dc07fc',
+  Air: '1f7fffbfffb7fbdff7b7fe7ffeeff7ddf7b7dffd7dfffdf71fe0dfeff',
+};
+const TEMPLATES: Record<string, Uint8Array> = {};
+for (const [k, hex] of Object.entries(TEMPLATE_HEX)) {
+  const bits = BigInt('0x' + hex).toString(2).padStart(225, '0');
+  TEMPLATES[k] = Uint8Array.from(bits, (c) => (c === '1' ? 1 : 0));
+}
+type HueClass = 'warm' | 'green' | 'cyan' | 'white' | 'other';
+const CLASS_OF: Record<string, HueClass> = { Fire: 'warm', Earth: 'warm', Chemtech: 'green', Hextech: 'cyan', Air: 'cyan' };
 
-type Px = { r: number; g: number; b: number };
-function stats(img: Electron.NativeImage): { mean: Px; sat: number; hue: number; bright: number; vec: Float32Array } {
-  const small = img.resize({ width: 8, height: 8, quality: 'good' });
-  const bmp = small.toBitmap(); // BGRA
-  let r = 0, g = 0, b = 0; const n = 64; const vec = new Float32Array(n);
-  for (let i = 0; i < n; i++) { const o = i * 4; b += bmp[o]; g += bmp[o + 1]; r += bmp[o + 2]; vec[i] = 0.114 * bmp[o] + 0.587 * bmp[o + 1] + 0.299 * bmp[o + 2]; }
-  r /= n; g /= n; b /= n;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+export interface HudState { dragons: Record<Side, DragonType[]>; grubs: Record<Side, number>; baron: Record<Side, number> }
+export interface HudEvent { name: 'DragonKill' | 'HordeKill' | 'BaronKill'; side: Side; extra: string; at: number }
+
+/** Píxeles RGB (fila a fila) de una imagen. */
+function rgbOf(img: Electron.NativeImage): { rgb: Uint8Array; w: number; h: number } {
+  const s = img.getSize(); const bmp = img.toBitmap(); const n = s.width * s.height; const rgb = new Uint8Array(n * 3);
+  for (let i = 0; i < n; i++) { rgb[i * 3] = bmp[i * 4 + 2]; rgb[i * 3 + 1] = bmp[i * 4 + 1]; rgb[i * 3 + 2] = bmp[i * 4]; }
+  return { rgb, w: s.width, h: s.height };
+}
+function median(a: number[]): number { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; }
+/** Máscara "icono" de una ventana 15×15: píxeles lejos del color mediano (el fondo, mapa incluido) + color medio del icono. */
+export function iconMask(rgb: Uint8Array, w: number, x0: number, y0: number): { mask: Uint8Array; n: number; hue: number; sat: number; val: number } {
+  const rs: number[] = [], gs: number[] = [], bs: number[] = [];
+  for (let y = 0; y < 15; y++) for (let x = 0; x < 15; x++) { const o = ((y0 + y) * w + x0 + x) * 3; rs.push(rgb[o]); gs.push(rgb[o + 1]); bs.push(rgb[o + 2]); }
+  const mr = median(rs), mg = median(gs), mb = median(bs);
+  const mask = new Uint8Array(225); let n = 0, sr = 0, sg = 0, sb = 0;
+  for (let i = 0; i < 225; i++) if (Math.abs(rs[i] - mr) + Math.abs(gs[i] - mg) + Math.abs(bs[i] - mb) > 60) { mask[i] = 1; n++; sr += rs[i]; sg += gs[i]; sb += bs[i]; }
+  if (!n) return { mask, n, hue: 0, sat: 0, val: 0 };
+  sr /= n; sg /= n; sb /= n;
+  const max = Math.max(sr, sg, sb), min = Math.min(sr, sg, sb);
   const sat = max === 0 ? 0 : (max - min) / max;
   let hue = 0;
   if (max !== min) {
-    if (max === r) hue = ((g - b) / (max - min)) % 6;
-    else if (max === g) hue = (b - r) / (max - min) + 2;
-    else hue = (r - g) / (max - min) + 4;
+    if (max === sr) hue = ((sg - sb) / (max - min)) % 6; else if (max === sg) hue = (sb - sr) / (max - min) + 2; else hue = (sr - sg) / (max - min) + 4;
     hue = (hue * 60 + 360) % 360;
   }
-  return { mean: { r, g, b }, sat, hue, bright: max / 255, vec };
+  return { mask, n, hue, sat, val: max / 255 };
 }
-function diff(a: Float32Array, b: Float32Array): number { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length / 255; }
-
-/** Tipo de dragón por tono del icono (los iconos del HUD son monocromos por elemento). */
-export function dragonFromColor(s: { sat: number; hue: number; bright: number }): DragonType | null {
-  if (s.sat < 0.2 && s.bright > 0.75) return 'Elder';      // blanco-azul brillante
-  if (s.sat < 0.2) return s.bright > 0.55 ? 'Air' : null;  // nubes: gris claro
-  const h = s.hue;
-  if (h < 22 || h >= 345) return 'Fire';                   // rojo-naranja
-  if (h < 48) return 'Earth';                              // ámbar/marrón
-  if (h < 150) return 'Chemtech';                          // verde
-  if (h < 200) return 'Water';                             // turquesa
-  if (h < 260) return 'Hextech';                           // azul-cian/violeta
-  return 'Fire';
+export function hueClass(c: { n: number; hue: number; sat: number; val: number }): HueClass {
+  if (c.n < 40) return 'other';
+  if (c.sat < 0.12 && c.val > 0.6) return 'white';
+  const h = c.hue;
+  if (h < 60 || h >= 340) return 'warm';
+  if (h < 150) return 'green';
+  if (h < 230) return 'cyan';
+  return 'other';
 }
+function iou(a: Uint8Array, b: Uint8Array): number { let i = 0, u = 0; for (let k = 0; k < 225; k++) { if (a[k] && b[k]) i++; if (a[k] || b[k]) u++; } return u ? i / u : 0; }
+/** Lee una casilla de tipo de dragón (ventana 23×19 centrada): tipo o null si no hay icono. */
+export function readDragonSlot(rgb: Uint8Array, w: number, x0: number, y0: number): DragonType | null {
+  let best: { type: DragonType; score: number } | null = null;
+  for (let dy = 0; dy <= 4; dy++) for (let dx = 0; dx <= 8; dx++) {
+    const c = iconMask(rgb, w, x0 + dx, y0 + dy);
+    if (c.n < 90) continue;
+    const hc = hueClass(c);
+    if (hc === 'other') continue;
+    if (hc === 'white') { if (!best || best.score < 0.5) best = { type: 'Elder', score: 0.5 }; continue; }
+    if (hc === 'warm') { const t = c.hue < 29 || c.hue >= 340 ? 'Fire' : 'Earth'; const s = iou(c.mask, TEMPLATES[t]); if (!best || s > best.score) best = { type: t, score: s }; continue; }
+    if (hc === 'green') { const s = iou(c.mask, TEMPLATES.Chemtech); if (!best || s > best.score) best = { type: 'Chemtech', score: s }; continue; }
+    // cian: océano (muy saturado) o hextech/nubes por silueta
+    if (c.sat >= 0.55) { if (!best || best.score < 0.5) best = { type: 'Water', score: 0.5 }; continue; }
+    const sh = iou(c.mask, TEMPLATES.Hextech), sa = iou(c.mask, TEMPLATES.Air);
+    const t: DragonType = sh >= sa ? 'Hextech' : 'Air'; const s = Math.max(sh, sa);
+    if (!best || s > best.score) best = { type: t, score: s };
+  }
+  return best && best.score >= 0.45 ? best.type : null;
+}
+/** Máscara de un dígito del contador: píxeles del color del equipo. */
+export function digitMask(rgb: Uint8Array, n: number, side: Side): Uint8Array {
+  const m = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    const r = rgb[i * 3], b = rgb[i * 3 + 2];
+    m[i] = side === 'blue' ? (b > 150 && b - r > 50 ? 1 : 0) : (r > 150 && r - b > 50 ? 1 : 0);
+  }
+  return m;
+}
+function maskIou(a: Uint8Array, b: Uint8Array): number { let i = 0, u = 0; for (let k = 0; k < a.length; k++) { if (a[k] && b[k]) i++; if (a[k] || b[k]) u++; } return u ? i / u : 1; }
 
 export class HudObjectives extends EventEmitter {
   private timer: ReturnType<typeof setInterval> | null = null;
   private busy = false;
   private geom: HudGeom = DEFAULT_GEOM;
-  state: HudState = { dragons: { blue: [], red: [] }, grubs: { blue: 0, red: 0 }, herald: { blue: false, red: false }, baron: { blue: 0, red: 0 } };
-  private pending: { key: string; n: number } | null = null;
-  // Fondo "vacío" de cada casilla (la barra del espectador lleva tinte azul/rojo
-  // por equipo, así que la saturación sola no sirve): se toma al empezar la
-  // partida y un icono = la casilla se aleja de su fondo.
-  private baseline: Map<string, Float32Array> | null = null;
-  private baselineAt = 0;
-  private grubVec: Record<Side, Float32Array | null> = { blue: null, red: null };
-  private baronOn: Record<Side, boolean> = { blue: false, red: false };
+  state: HudState = { dragons: { blue: [], red: [] }, grubs: { blue: 0, red: 0 }, baron: { blue: 0, red: 0 } };
+  /** Última máscara estable de cada contador (clave "dragons.blue"…). */
+  private stable = new Map<string, Uint8Array>();
+  /** Lectura pendiente de confirmar en la siguiente captura. */
+  private pending = new Map<string, Uint8Array>();
+  private synced = false;
   lastCapture: { at: number; w: number; h: number } | null = null;
   active = false;
-  lateStart = false;
 
-  /** `isLive` dice si hay partida en curso y su reloj: sin partida no se captura nada. */
   constructor(private userData: string, private isLive: () => { active: boolean; gameTime: number } = () => ({ active: true, gameTime: 0 })) { super(); this.loadGeom(); }
 
   loadGeom() {
     try {
-      const raw = fs.readFileSync(path.join(this.userData, 'hud-geom.json'), 'utf8');
-      const j = JSON.parse(raw);
-      this.geom = { ...DEFAULT_GEOM, ...j, dragons: { ...DEFAULT_GEOM.dragons, ...(j.dragons || {}) }, grubs: { ...DEFAULT_GEOM.grubs, ...(j.grubs || {}) }, herald: { ...DEFAULT_GEOM.herald, ...(j.herald || {}) }, baron: { ...DEFAULT_GEOM.baron, ...(j.baron || {}) } };
+      const j = JSON.parse(fs.readFileSync(path.join(this.userData, 'hud-geom.json'), 'utf8'));
+      this.geom = {
+        counts: { blue: { ...DEFAULT_GEOM.counts.blue, ...(j.counts?.blue || {}) }, red: { ...DEFAULT_GEOM.counts.red, ...(j.counts?.red || {}) } },
+        dragonSlots: { blue: j.dragonSlots?.blue || DEFAULT_GEOM.dragonSlots.blue, red: j.dragonSlots?.red || DEFAULT_GEOM.dragonSlots.red },
+        sameDigit: Number(j.sameDigit) || DEFAULT_GEOM.sameDigit,
+      };
       console.log('[hud] geometría personalizada cargada');
     } catch { this.geom = DEFAULT_GEOM; }
   }
 
-  start(intervalMs = 2500) {
+  start(intervalMs = 1000) {
     if (this.timer) return;
     this.reset();
     this.active = true;
@@ -127,11 +167,10 @@ export class HudObjectives extends EventEmitter {
     console.log('[hud] lector del HUD activo');
   }
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; this.active = false; }
-  /** Partida nueva: todo a cero y se vuelve a tomar el fondo de las casillas. */
+  /** Partida nueva: todo a cero; los contadores se vuelven a leer. */
   reset() {
-    this.state = { dragons: { blue: [], red: [] }, grubs: { blue: 0, red: 0 }, herald: { blue: false, red: false }, baron: { blue: 0, red: 0 } };
-    this.pending = null; this.baseline = null; this.baselineAt = 0; this.lateStart = false;
-    this.grubVec = { blue: null, red: null }; this.baronOn = { blue: false, red: false };
+    this.state = { dragons: { blue: [], red: [] }, grubs: { blue: 0, red: 0 }, baron: { blue: 0, red: 0 } };
+    this.stable.clear(); this.pending.clear(); this.synced = false;
   }
 
   /** Captura completa a disco (PNG) para calibrar la geometría. */
@@ -151,44 +190,27 @@ export class HudObjectives extends EventEmitter {
     const s = shot.getSize(); this.lastCapture = { at: Date.now(), w: s.width, h: s.height };
     return shot;
   }
-  private crop(shot: Electron.NativeImage, b: Box) {
+  private cropBox(shot: Electron.NativeImage, b: Box) {
     const s = shot.getSize();
     return shot.crop({ x: Math.round(b.x * s.width), y: Math.round(b.y * s.height), width: Math.max(2, Math.round(b.w * s.width)), height: Math.max(2, Math.round(b.h * s.height)) });
   }
-
-  /** Color RGB de 8×8 px como vector (para comparar con el fondo). */
-  private rgbVec(img: Electron.NativeImage): Float32Array {
-    const bmp = img.resize({ width: 8, height: 8, quality: 'good' }).toBitmap();
-    const v = new Float32Array(64 * 3);
-    for (let i = 0; i < 64; i++) { const o = i * 4; v[i * 3] = bmp[o + 2]; v[i * 3 + 1] = bmp[o + 1]; v[i * 3 + 2] = bmp[o]; }
-    return v;
+  /** Ventana 23×19 alrededor de una casilla de dragón (escalada a la resolución real). */
+  private readSlot(shot: Electron.NativeImage, slot: { cx: number; cy: number }): DragonType | null {
+    const s = shot.getSize(); const k = s.width / 1920;
+    const x = Math.round((slot.cx - 11) * k), y = Math.round((slot.cy - 9) * k);
+    let win = shot.crop({ x, y, width: Math.round(23 * k), height: Math.round(19 * k) });
+    if (k !== 1) win = win.resize({ width: 23, height: 19, quality: 'good' });
+    const { rgb, w } = rgbOf(win);
+    return readDragonSlot(rgb, w, 0, 0);
   }
-  private static rgbDiff(a: Float32Array, b: Float32Array): number { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length / 255; }
-  /** Color medio de los píxeles que cambiaron respecto al fondo (= el icono), en HSV. */
-  private static iconColor(cur: Float32Array, base: Float32Array): { sat: number; hue: number; bright: number } {
-    let r = 0, g = 0, b = 0, n = 0;
-    for (let i = 0; i < 64; i++) {
-      const d = Math.abs(cur[i * 3] - base[i * 3]) + Math.abs(cur[i * 3 + 1] - base[i * 3 + 1]) + Math.abs(cur[i * 3 + 2] - base[i * 3 + 2]);
-      if (d > 60) { r += cur[i * 3]; g += cur[i * 3 + 1]; b += cur[i * 3 + 2]; n++; }
-    }
-    if (!n) return { sat: 0, hue: 0, bright: 0 };
-    r /= n; g /= n; b /= n;
-    const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    const sat = max === 0 ? 0 : (max - min) / max;
-    let hue = 0;
-    if (max !== min) {
-      if (max === r) hue = ((g - b) / (max - min)) % 6; else if (max === g) hue = (b - r) / (max - min) + 2; else hue = (r - g) / (max - min) + 4;
-      hue = (hue * 60 + 360) % 360;
-    }
-    return { sat, hue, bright: max / 255 };
+  private readDigit(shot: Electron.NativeImage, b: Box, side: Side): Uint8Array {
+    const { rgb, w, h } = rgbOf(this.cropBox(shot, b));
+    return digitMask(rgb, w * h, side);
   }
-
-  private slots(): Array<[string, Box]> {
-    const g = this.geom; const out: Array<[string, Box]> = [];
-    for (const side of ['blue', 'red'] as Side[]) {
-      g.dragons[side].forEach((b, i) => out.push([`d.${side}.${i}`, b]));
-      out.push([`g.${side}`, g.grubs[side]], [`h.${side}`, g.herald[side]], [`b.${side}`, g.baron[side]]);
-    }
+  /** Dragones ya tomados por un lado según los iconos presentes (al entrar tarde). */
+  private scanDragons(shot: Electron.NativeImage, side: Side): DragonType[] {
+    const out: DragonType[] = [];
+    for (const slot of this.geom.dragonSlots[side]) { const t = this.readSlot(shot, slot); if (!t) break; out.push(t); }
     return out;
   }
 
@@ -196,47 +218,39 @@ export class HudObjectives extends EventEmitter {
     if (this.busy) return; this.busy = true;
     try {
       const lv = this.isLive();
-      if (!lv.active) { if (this.baseline) this.reset(); return; } // entre partidas no se mira nada
+      if (!lv.active) { if (this.synced) this.reset(); return; } // entre partidas no se mira nada
       const shot = await this.capture(); if (!shot) return;
-      const cur = new Map<string, Float32Array>();
-      for (const [k, b] of this.slots()) cur.set(k, this.rgbVec(this.crop(shot, b)));
-      if (!this.baseline) {
-        // Primer tick con partida en curso: el fondo. Si entramos tarde (ya hay
-        // objetivos), lo que ya esté pintado se queda como fondo y solo se
-        // detecta lo que venga después (igual que el Live Client).
-        this.baseline = cur; this.baselineAt = lv.gameTime; this.lateStart = lv.gameTime > 240;
-        console.log('[hud] fondo de casillas tomado a', Math.round(lv.gameTime), 's');
+      const keys: Array<[string, Side, 'dragons' | 'baron' | 'grubs']> = [];
+      for (const side of ['blue', 'red'] as Side[]) for (const k of ['dragons', 'baron', 'grubs'] as const) keys.push([`${k}.${side}`, side, k]);
+      const cur = new Map<string, Uint8Array>();
+      for (const [key, side, k] of keys) cur.set(key, this.readDigit(shot, this.geom.counts[side][k], side));
+      if (!this.synced) {
+        // Primera lectura con partida en curso: los contadores actuales son el punto de
+        // partida (si entramos tarde, lo que ya pasó no se emite, igual que el Live Client).
+        for (const [key] of keys) this.stable.set(key, cur.get(key)!);
+        for (const side of ['blue', 'red'] as Side[]) this.state.dragons[side] = this.scanDragons(shot, side);
+        this.synced = true;
+        console.log('[hud] contadores sincronizados a', Math.round(lv.gameTime), 's; dragones vistos', JSON.stringify(this.state.dragons));
+        this.emit('state', this.state);
         return;
       }
-      const base = this.baseline;
-      const thr = 0.10;
-      const read = { dragons: { blue: [] as DragonType[], red: [] as DragonType[] }, herald: { blue: false, red: false }, baron: { blue: false, red: false }, grubs: { blue: false, red: false } };
-      for (const side of ['blue', 'red'] as Side[]) {
-        for (let i = 0; i < this.geom.dragons[side].length; i++) {
-          const k = `d.${side}.${i}`; const c = cur.get(k)!; const b = base.get(k)!;
-          if (HudObjectives.rgbDiff(c, b) < thr) break; // se llenan de dentro hacia afuera
-          read.dragons[side].push(dragonFromColor(HudObjectives.iconColor(c, b)) || 'Fire');
-        }
-        read.herald[side] = HudObjectives.rgbDiff(cur.get(`h.${side}`)!, base.get(`h.${side}`)!) >= thr;
-        read.baron[side] = HudObjectives.rgbDiff(cur.get(`b.${side}`)!, base.get(`b.${side}`)!) >= thr;
-        const gv = this.grubVec[side] || base.get(`g.${side}`)!;
-        read.grubs[side] = HudObjectives.rgbDiff(cur.get(`g.${side}`)!, gv) >= thr;
-      }
-      // Exige dos capturas iguales seguidas antes de aceptar un cambio (parpadeos, tooltips).
-      const key = JSON.stringify(read);
-      if (!this.pending || this.pending.key !== key) { this.pending = { key, n: 1 }; return; }
-      if (this.pending.n >= 2) return; // ya aplicado
-      this.pending.n = 2;
       const events: HudEvent[] = [];
       const now = Date.now();
-      for (const side of ['blue', 'red'] as Side[]) {
-        const prev = this.state.dragons[side];
-        if (read.dragons[side].length > prev.length) for (const t of read.dragons[side].slice(prev.length)) events.push({ name: 'DragonKill', side, extra: t, at: now });
-        if (read.dragons[side].length >= prev.length) this.state.dragons[side] = read.dragons[side];
-        if (read.grubs[side]) { this.state.grubs[side]++; events.push({ name: 'HordeKill', side, extra: '', at: now }); this.grubVec[side] = cur.get(`g.${side}`)!; }
-        if (read.herald[side] && !this.state.herald[side]) { this.state.herald[side] = true; events.push({ name: 'HeraldKill', side, extra: '', at: now }); }
-        if (read.baron[side] && !this.baronOn[side]) { this.state.baron[side]++; events.push({ name: 'BaronKill', side, extra: '', at: now }); }
-        this.baronOn[side] = read.baron[side];
+      for (const [key, side, k] of keys) {
+        const m = cur.get(key)!; const st = this.stable.get(key)!;
+        if (maskIou(m, st) >= this.geom.sameDigit) { this.pending.delete(key); continue; }
+        // Cambió: exigir dos capturas seguidas con el mismo dígito nuevo (descarta parpadeos y tooltips).
+        const p = this.pending.get(key);
+        if (!p || maskIou(p, m) < this.geom.sameDigit) { this.pending.set(key, m); continue; }
+        this.pending.delete(key); this.stable.set(key, m);
+        if (k === 'dragons') {
+          const idx = this.state.dragons[side].length;
+          const slot = this.geom.dragonSlots[side][Math.min(idx, this.geom.dragonSlots[side].length - 1)];
+          const type = this.readSlot(shot, slot) || 'Fire';
+          this.state.dragons[side].push(type);
+          events.push({ name: 'DragonKill', side, extra: type, at: now });
+        } else if (k === 'baron') { this.state.baron[side]++; events.push({ name: 'BaronKill', side, extra: '', at: now }); }
+        else { this.state.grubs[side]++; events.push({ name: 'HordeKill', side, extra: '', at: now }); }
       }
       if (events.length) { this.emit('events', events); this.emit('state', this.state); }
     } catch (e: any) { console.warn('[hud] tick', e?.message); }
@@ -244,4 +258,4 @@ export class HudObjectives extends EventEmitter {
   }
 }
 
-export const _internals = { stats, dragonFromColor, nativeImage };
+export const _internals = { iconMask, hueClass, readDragonSlot, digitMask, nativeImage, TEMPLATES };

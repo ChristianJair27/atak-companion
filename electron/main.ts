@@ -24,6 +24,7 @@ import { ReplayFetcher } from './services/replay-fetcher.js';
 import { getPatchData } from './services/patch.js';
 import { AugmentDetector, CARD_GEOM, CARD_GEOM_ARENA } from './services/augment-detector.js';
 import { HudObjectives } from './services/hud-objectives.js';
+import { ObsClient, type ObsScenes } from './services/obs.js';
 import { analyzeDraft, draftAiNames, type DraftRequest, rerankPicks, configureDraftAi, type PickRerankRequest, adjustRunesForDraft, getRuneCatalog } from './services/draft-ai.js';
 import {
   fetchRosterOpgg,
@@ -67,6 +68,15 @@ function hudReader(): HudObjectives {
     broadcast('hud-status', hudStatus());
   });
   return hud;
+}
+// OBS: cambio de escena automático por fase (champ select / partida / post-partida / espera).
+const obs = new ObsClient();
+let obsScenes: ObsScenes = {};
+obs.on('status', () => broadcast('obs-status', obs.status()));
+function obsScene(kind: keyof ObsScenes) {
+  const name = obsScenes[kind];
+  if (!casterMode || !obs.connected || !name) return;
+  obs.setScene(name).then((changed) => { if (changed) console.log('[obs] escena →', name); }).catch((e) => console.warn('[obs]', e.message));
 }
 function hudStatus() {
   return { active: Boolean(hud?.active), events: feed.hudCount, state: hud?.state ?? null, lastCapture: hud?.lastCapture ?? null };
@@ -321,18 +331,21 @@ function handlePhase(phase: string) {
   broadcast('phase', phase);
   switch (phase) {
     case 'ChampSelect':
+      obsScene('champselect');
       // En modo caster no se auto-abre NINGÚN overlay in-game: la prioridad es
       // la vista de espectador limpia. Los hotkeys siguen como override manual.
       if (!casterMode) ensure('champselect');
       break;
     case 'InProgress':
     case 'GameStart':
+      obsScene('ingame');
       closeWin('champselect');
       if (!casterMode) ensure('hud');
       break;
     case 'WaitingForStats':
     case 'PreEndOfGame':
     case 'EndOfGame':
+      obsScene('postgame');
       closeWin('hud');
       closeWin('scoreboard');
       closeWin('players');
@@ -346,6 +359,7 @@ function handlePhase(phase: string) {
     case 'Matchmaking':
     case 'ReadyCheck':
     default:
+      if (phase === 'None' || phase === 'Lobby') obsScene('idle');
       // Dodge / cancel / salida de champ select → cerrar panel SIEMPRE.
       // Antes solo se cerraba en Lobby/None y a veces se quedaba colgada.
       closeWin('champselect');
@@ -958,8 +972,10 @@ ipcMain.handle('status', () => ({
   frontend: FRONTEND,
 }));
 ipcMain.handle('patch-data', async () => await getPatchData());
-ipcMain.handle('caster-start', (_e, cfg: FeedConfig & { showOverlay?: boolean; hudReader?: boolean }) => {
+ipcMain.handle('caster-start', (_e, cfg: FeedConfig & { showOverlay?: boolean; hudReader?: boolean; obs?: { host: string; port: number; password: string; scenes: ObsScenes } | null }) => {
   casterMode = true;
+  obsScenes = cfg.obs?.scenes || {};
+  obs.configure(cfg.obs && (cfg.obs.host || cfg.obs.port) ? { host: cfg.obs.host || '127.0.0.1', port: Number(cfg.obs.port) || 4455, password: cfg.obs.password || '' } : null);
   feed.configure(cfg.token ? cfg : null);
   // Prioridad total a la vista del caster: cerrar cualquier overlay in-game
   // que ya estuviera abierto (se pueden reabrir a mano con los hotkeys).
@@ -969,7 +985,7 @@ ipcMain.handle('caster-start', (_e, cfg: FeedConfig & { showOverlay?: boolean; h
   closeWin('champselect');
   closeWin('eog');
   if (cfg.showOverlay) ensure('caster');
-  if (cfg.token && cfg.hudReader !== false) { feed.resetHud(); hudReader().loadGeom(); hudReader().start(2500); }
+  if (cfg.token && cfg.hudReader !== false) { feed.resetHud(); hudReader().loadGeom(); hudReader().start(1000); }
   seriesUsed.load(`${cfg.channel}|${cfg.team1}|${cfg.team2}`);
   return { ok: true };
 });
@@ -979,11 +995,24 @@ ipcMain.handle('caster-series', () => ({ games: seriesUsed.games, used: [...seri
 ipcMain.handle('caster-stop', () => {
   casterMode = false;
   feed.configure(null);
+  obs.configure(null);
   hud?.stop();
   closeWin('caster');
   return { ok: true };
 });
 ipcMain.handle('hud-status', () => hudStatus());
+ipcMain.handle('obs-status', () => obs.status());
+ipcMain.handle('obs-scenes', async () => { try { return { ok: true, scenes: await obs.scenes() }; } catch (e: any) { return { ok: false, error: String(e?.message || e), scenes: [] }; } });
+ipcMain.handle('obs-test', async (_e, cfg: { host: string; port: number; password: string }) => {
+  // Conecta con lo que haya en el formulario (sin iniciar la transmisión) y lista las escenas.
+  obs.configure({ host: cfg.host || '127.0.0.1', port: Number(cfg.port) || 4455, password: cfg.password || '' });
+  const until = Date.now() + 4000;
+  while (!obs.connected && Date.now() < until) await new Promise((r) => setTimeout(r, 150));
+  if (!obs.connected) { const err = obs.lastError || 'No conecta: ¿OBS abierto con el servidor WebSocket activado (Herramientas → Ajustes del servidor WebSocket)?'; if (!casterMode) obs.configure(null); return { ok: false, error: err, scenes: [] }; }
+  try { const scenes = await obs.scenes(); if (!casterMode) obs.configure(null); return { ok: true, scenes }; }
+  catch (e: any) { if (!casterMode) obs.configure(null); return { ok: false, error: String(e?.message || e), scenes: [] }; }
+});
+ipcMain.handle('obs-replay', async () => ({ ok: await obs.saveReplayBuffer() }));
 // Guarda una captura completa de la pantalla (PNG) en la carpeta de datos para
 // calibrar la geometría del HUD (hud-geom.json). Solo en disco local.
 ipcMain.handle('hud-capture', async () => {

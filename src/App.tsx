@@ -22,6 +22,7 @@ export type UpdateStatus = {
   version?: string; percent?: number; error?: string; checkedAt?: number; current?: string;
 };
 
+export interface ObsStatus { connected: boolean; error: string; scene: string; configured: boolean }
 export interface HudStatus {
   active: boolean;
   events: number;
@@ -51,6 +52,11 @@ declare global {
       casterStop: () => Promise<any>;
       hudStatus: () => Promise<HudStatus>;
       casterNewSeries: () => Promise<{ ok: boolean; games: number }>;
+      obsStatus: () => Promise<ObsStatus>;
+      obsScenes: () => Promise<{ ok: boolean; scenes: string[]; error?: string }>;
+      obsTest: (cfg: { host: string; port: number; password: string }) => Promise<{ ok: boolean; scenes: string[]; error?: string }>;
+      obsReplay: () => Promise<{ ok: boolean }>;
+      onObsStatus: (fn: (s: ObsStatus) => void) => () => void;
       casterSeries: () => Promise<{ games: number; used: number }>;
       hudCapture: () => Promise<{ ok: boolean; file?: string; error?: string }>;
       hudOpenFolder: () => Promise<void>;

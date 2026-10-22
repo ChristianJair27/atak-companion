@@ -12,7 +12,7 @@ import { fmtClock, phaseEs, useLive, useStatus } from './shared';
 import DraftView from './DraftView';
 import { EASE, Rise, Stagger, Ticker, rise, staggerParent, swap } from '../motion';
 import { HxHex, HxPanel, HxSegmented } from './hextech';
-import type { ReplayStatus, AutofeedStatus, UpdateStatus, HudStatus } from '../App';
+import type { ReplayStatus, AutofeedStatus, UpdateStatus, HudStatus, ObsStatus } from '../App';
 import './home-motion.css';
 
 // ── Movimiento (constantes a nivel de módulo: no cambian entre renders, así el
@@ -92,11 +92,15 @@ interface CasterCfg {
   logo1: string;
   logo2: string;
   accent: string;
+  /** OBS (obs-websocket v5): host, puerto y contraseña; escenas por fase (vacío = no cambiar). */
+  obsHost: string; obsPort: string; obsPassword: string;
+  sceneChampSelect: string; sceneInGame: string; scenePostGame: string; sceneIdle: string;
 }
 
 const defaultCfg: CasterCfg = {
   channel: 'lqc-2026', token: '', matchLabel: '', team1: '', team2: '',
   streamUrl: '', logo1: '', logo2: '', accent: '',
+  obsHost: '127.0.0.1', obsPort: '4455', obsPassword: '', sceneChampSelect: '', sceneInGame: '', scenePostGame: '', sceneIdle: '',
 };
 
 const loadCfg = (): CasterCfg => {
@@ -215,7 +219,10 @@ export default function MainView() {
     setBusy(true);
     try {
       if (transmitting) await window.atak.casterStop();
-      else await window.atak.casterStart({ ...caster, backend: status?.backend, showOverlay });
+      else await window.atak.casterStart({
+        ...caster, backend: status?.backend, showOverlay,
+        obs: caster.obsHost || caster.obsPort ? { host: caster.obsHost, port: Number(caster.obsPort) || 4455, password: caster.obsPassword, scenes: { champselect: caster.sceneChampSelect, ingame: caster.sceneInGame, postgame: caster.scenePostGame, idle: caster.sceneIdle } } : null,
+      });
     } finally {
       setBusy(false);
     }
@@ -230,6 +237,7 @@ export default function MainView() {
   const overlayUrl = `${frontend}/broadcast/${caster.channel || 'lqc-2026'}/overlay`;
   const boardUrl = `${frontend}/broadcast/${caster.channel || 'lqc-2026'}`;
   const champSelectUrl = `${frontend}/broadcast/${caster.channel || 'lqc-2026'}/champselect`;
+  const introUrl = `${frontend}/broadcast/${caster.channel || 'lqc-2026'}/intro`;
   const [series, setSeries] = useState<{ games: number; used: number }>({ games: 0, used: 0 });
   useEffect(() => {
     if (!transmitting) return;
@@ -237,6 +245,32 @@ export default function MainView() {
     tick(); const t = window.setInterval(tick, 5000); return () => window.clearInterval(t);
   }, [transmitting]);
   const newSeries = async () => { const r = await window.atak.casterNewSeries?.(); if (r) setSeries({ games: 0, used: 0 }); };
+  // OBS automático: estado, prueba de conexión y lista de escenas.
+  const [obs, setObs] = useState<ObsStatus | null>(null);
+  const [obsScenes, setObsScenes] = useState<string[]>([]);
+  const [obsMsg, setObsMsg] = useState('');
+  useEffect(() => {
+    void window.atak.obsStatus?.().then((s) => { if (s) setObs(s); }).catch(() => {});
+    return window.atak.onObsStatus?.((s) => setObs(s));
+  }, []);
+  const obsTest = async () => {
+    setObsMsg('Conectando…');
+    const r = await window.atak.obsTest?.({ host: caster.obsHost, port: Number(caster.obsPort) || 4455, password: caster.obsPassword });
+    if (r?.ok) { setObsScenes(r.scenes); setObsMsg(`✓ Conectado · ${r.scenes.length} escenas`); } else setObsMsg(r?.error || 'No conecta');
+  };
+  const sceneSel = (k: 'sceneChampSelect' | 'sceneInGame' | 'scenePostGame' | 'sceneIdle', label: string) => (
+    <div>
+      <span className="hx-label">{label}</span>
+      {obsScenes.length ? (
+        <select className={inputCls()} value={caster[k]} disabled={transmitting} onChange={(e) => setCaster((c) => ({ ...c, [k]: e.target.value }))}>
+          <option value="">(no cambiar)</option>
+          {obsScenes.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      ) : (
+        <input className={inputCls()} placeholder="nombre de la escena" value={caster[k]} disabled={transmitting} onChange={set(k)} />
+      )}
+    </div>
+  );
 
   const set = (k: keyof CasterCfg) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setCaster((c) => ({ ...c, [k]: e.target.value }));
@@ -591,6 +625,9 @@ export default function MainView() {
                       <button type="button" className="hx-btn" onClick={() => copy('cs', champSelectUrl)} title={`${champSelectUrl} · fuente de navegador 1920×1080 para la selección de campeones (el caster debe estar en el lobby como espectador)`}>
                         <Crossfade id={copied === 'cs' ? 'ok' : 'idle'}>{copied === 'cs' ? '✓ Copiado' : 'Copiar link champ select'}</Crossfade>
                       </button>
+                      <button type="button" className="hx-btn" onClick={() => copy('intro', introUrl)} title={`${introUrl} · cinemática de intro de la serie (1920×1080): se dispara sola al empezar la selección de campeones`}>
+                        <Crossfade id={copied === 'intro' ? 'ok' : 'idle'}>{copied === 'intro' ? '✓ Copiado' : 'Copiar link intro'}</Crossfade>
+                      </button>
                       <button type="button" className="hx-btn ghost" onClick={() => { void newSeries(); }} disabled={!transmitting} title="Fearless: olvida los campeones ya usados en la serie (hazlo al empezar otra serie)">
                         {`Nueva serie${series.games ? ` · juego ${series.games + 1}` : ''}`}
                       </button>
@@ -609,6 +646,37 @@ export default function MainView() {
                       LINK OVERLAY, 1920×1080. El tablero completo es para ver en cualquier navegador.
                       Al haber dragón/barón, el overlay lanza la animación solo.
                     </div>
+                  </Rise>
+
+                  {/* OBS automático: escenas por fase + repetición */}
+                  <Rise>
+                    <HxPanel corners className="hm-card" inner={{ padding: '14px 18px', display: 'grid', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <span className="hx-label head">OBS automático</span>
+                        <span className={`hx-pill${obs?.connected ? ' ok' : obs?.configured ? ' miss' : ''}`}>{obs?.connected ? `Conectado · ${obs.scene || 'sin escena'}` : obs?.configured ? (obs.error || 'Conectando…') : 'Apagado'}</span>
+                        <div className="no-drag" style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                          <button type="button" className="hx-btn ghost sm" onClick={() => { void obsTest(); }}>Probar conexión</button>
+                          <button type="button" className="hx-btn ghost sm" disabled={!obs?.connected} onClick={() => { void window.atak.obsReplay?.(); }} title="Guarda el búfer de repetición de OBS (debe estar activo)">Guardar repetición</button>
+                        </div>
+                      </div>
+                      {obsMsg && <div className="hx-mono" style={{ fontSize: 12.5 }}>{obsMsg}</div>}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.6fr 1fr', gap: 8 }}>
+                        <div><span className="hx-label">Host</span><input className={inputCls(true)} placeholder="127.0.0.1" value={caster.obsHost} disabled={transmitting} onChange={set('obsHost')} /></div>
+                        <div><span className="hx-label">Puerto</span><input className={inputCls(true)} placeholder="4455" value={caster.obsPort} disabled={transmitting} onChange={set('obsPort')} /></div>
+                        <div><span className="hx-label">Contraseña</span><input className={inputCls(true)} type="password" placeholder="(la de OBS)" value={caster.obsPassword} disabled={transmitting} onChange={set('obsPassword')} /></div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                        {sceneSel('sceneChampSelect', 'Selección')}
+                        {sceneSel('sceneInGame', 'Partida')}
+                        {sceneSel('scenePostGame', 'Post-partida')}
+                        {sceneSel('sceneIdle', 'Espera')}
+                      </div>
+                      <div className="hm-help">
+                        Con la transmisión iniciada, el companion cambia la escena de OBS solo: al entrar en selección de campeones,
+                        al cargar la partida, al terminar y al volver al lobby. En OBS: Herramientas → Ajustes del servidor WebSocket →
+                        activar y copiar la contraseña. Deja vacía una fase para no tocarla.
+                      </div>
+                    </HxPanel>
                   </Rise>
 
                   {/* Lector del HUD: qué ha leído + captura para calibrar */}
