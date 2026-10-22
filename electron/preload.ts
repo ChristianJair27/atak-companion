@@ -42,6 +42,8 @@ contextBridge.exposeInMainWorld('atak', {
   casterStart: (cfg: any) => ipcRenderer.invoke('caster-start', cfg),
   casterStop: () => ipcRenderer.invoke('caster-stop'),
   hudStatus: () => ipcRenderer.invoke('hud-status'),
+  casterNewSeries: () => ipcRenderer.invoke('caster-new-series'),
+  casterSeries: () => ipcRenderer.invoke('caster-series'),
   hudCapture: () => ipcRenderer.invoke('hud-capture'),
   hudOpenFolder: () => ipcRenderer.invoke('hud-open-folder'),
   onHudStatus: on('hud-status'),

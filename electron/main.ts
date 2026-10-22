@@ -444,6 +444,12 @@ lcu.on('champ-select-update', (state) => {
         if (a?.completed) myPick.locked = true; else { myPick.pending = true; if (a?.isInProgress) myPick.inProgress = true; }
       }
     }
+    // Celdas con el pick ya bloqueado (acción de pick completada): el overlay de
+    // champ select distingue "eligiendo" de "bloqueado".
+    const lockedCells = new Set<number>();
+    for (const group of (state.session?.actions || []) as any[][]) {
+      for (const a of group || []) if (String(a?.type) === 'pick' && a?.completed && a?.actorCellId != null) lockedCells.add(Number(a.actorCellId));
+    }
     const mapPick = (p: any) => {
       const championId = Number(p.championId || p.championPickIntent || 0) || 0;
       const meta = championId && patch ? patch.champById[championId] : null;
@@ -452,6 +458,9 @@ lcu.on('champ-select-update', (state) => {
         cellId: p.cellId,
         championId,
         championName: meta?.name || '',
+        championKey: meta?.id || '',
+        locked: lockedCells.has(Number(p.cellId)) && Number(p.championId) > 0,
+        puuid: String(p.puuid || ''),
         tags: meta?.tags || [],
         position: p.assignedPosition || '',
         isLocal: p.cellId === state.session?.localPlayerCellId,
@@ -487,8 +496,59 @@ lcu.on('champ-select-update', (state) => {
     };
     lastChampSelect = csPayload;
     broadcast('champ-select', csPayload);
+    // Modo caster: el champ select va al overlay de selección (OBS). Las celdas
+    // 0-4 son el lado azul y 5-9 el rojo, sea quien sea "myTeam" (el caster
+    // suele estar de espectador en el lobby de la custom).
+    if (feed.active) {
+      const all = [...csPayload.team, ...csPayload.enemy];
+      const side = (c: any) => (Number(c.cellId) < 5 ? 'blue' : 'red');
+      const myIsBlue = (csPayload.team[0] ? Number(csPayload.team[0].cellId) : 0) < 5;
+      const cell = (c: any) => ({ cellId: c.cellId, championId: c.championId, championName: c.championName, championKey: c.championKey, position: c.position, summonerName: c.summonerName, tagLine: c.tagLine, puuid: c.puuid, acting: c.acting, locked: c.locked });
+      const payload = {
+        phase: csPayload.phase, actionType: csPayload.actionType, timerSecs: csPayload.timerSecs, timerTotalSecs: state.timerTotalSecs,
+        blue: all.filter((c) => side(c) === 'blue').map(cell),
+        red: all.filter((c) => side(c) === 'red').map(cell),
+        bans: { blue: (myIsBlue ? csPayload.bans.ally : csPayload.bans.enemy).map((b: any) => b.id), red: (myIsBlue ? csPayload.bans.enemy : csPayload.bans.ally).map((b: any) => b.id) },
+        used: seriesUsed.forSides(all.filter((c) => side(c) === 'blue').map((c) => c.puuid), all.filter((c) => side(c) === 'red').map((c) => c.puuid)),
+        game: seriesUsed.games + 1,
+      };
+      seriesUsed.observe(all);
+      void feed.pushChampSelect(payload);
+    }
   })();
 });
+// Fearless: campeones ya usados en la serie, por jugador (puuid). Así da igual
+// que los equipos cambien de lado entre partidas. Se guarda en disco por canal
+// y se limpia con "Nueva serie" o al cambiar los equipos del modo caster.
+const seriesUsed = {
+  games: 0,
+  used: new Map<string, Set<number>>(),
+  current: new Map<string, number>(), // puuid → campeón bloqueado en el champ select en curso
+  teamsKey: '',
+  file(): string { return path.join(app.getPath('userData'), 'series-used.json'); },
+  load(teamsKey: string) {
+    this.teamsKey = teamsKey; this.games = 0; this.used.clear(); this.current.clear();
+    try {
+      const j = JSON.parse(readFileSync(this.file(), 'utf8'));
+      if (j?.teamsKey === teamsKey) { this.games = Number(j.games) || 0; for (const [k, v] of Object.entries(j.used || {})) this.used.set(k, new Set((v as number[]).map(Number))); }
+    } catch { /* sin archivo */ }
+  },
+  save() {
+    try { writeFile(this.file(), JSON.stringify({ teamsKey: this.teamsKey, games: this.games, used: Object.fromEntries([...this.used].map(([k, v]) => [k, [...v]])) }), () => {}); } catch { /* */ }
+  },
+  reset() { this.games = 0; this.used.clear(); this.current.clear(); this.save(); },
+  observe(cells: any[]) { for (const c of cells) if (c.locked && c.puuid && c.championId) this.current.set(c.puuid, c.championId); },
+  /** Al terminar el champ select, lo bloqueado pasa a "usado". */
+  commit() {
+    if (!this.current.size) return;
+    for (const [puuid, id] of this.current) { if (!this.used.has(puuid)) this.used.set(puuid, new Set()); this.used.get(puuid)!.add(id); }
+    this.current.clear(); this.games++; this.save();
+  },
+  forSides(bluePuuids: string[], redPuuids: string[]) {
+    const pick = (ps: string[]) => { const out = new Set<number>(); for (const p of ps) for (const id of this.used.get(p) || []) out.add(id); return [...out]; };
+    return { blue: pick(bluePuuids), red: pick(redPuuids) };
+  },
+};
 /** Último champ select mapeado (equipos con tags): lo usa el ajuste de runas al draft. */
 let lastChampSelect: { team: any[]; enemy: any[] } | null = null;
 // Tu pool (OP.GG: partidas/victorias de la temporada) se calienta al entrar al
@@ -521,6 +581,7 @@ lcu.on('champ-select-ended', () => {
   lastChampSelect = null;
   broadcast('champ-select-ended');
   closeWin('champselect');
+  if (feed.active) { seriesUsed.commit(); void feed.pushChampSelect({ ended: true }, { force: true }); }
 });
 // Build de un campeón → broadcast 'champion-build'. `preview` marca las builds
 // que el usuario pidió a mano (click en una sugerencia) para distinguirlas de su
@@ -909,8 +970,12 @@ ipcMain.handle('caster-start', (_e, cfg: FeedConfig & { showOverlay?: boolean; h
   closeWin('eog');
   if (cfg.showOverlay) ensure('caster');
   if (cfg.token && cfg.hudReader !== false) { feed.resetHud(); hudReader().loadGeom(); hudReader().start(2500); }
+  seriesUsed.load(`${cfg.channel}|${cfg.team1}|${cfg.team2}`);
   return { ok: true };
 });
+// Fearless: empezar una serie nueva (olvida los campeones usados).
+ipcMain.handle('caster-new-series', () => { seriesUsed.reset(); return { ok: true, games: 0 }; });
+ipcMain.handle('caster-series', () => ({ games: seriesUsed.games, used: [...seriesUsed.used.values()].reduce((n, s) => n + s.size, 0) }));
 ipcMain.handle('caster-stop', () => {
   casterMode = false;
   feed.configure(null);

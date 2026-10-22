@@ -25,6 +25,8 @@ export interface ChampSelectState {
   localPlayerPosition: string;
   phase: string;
   timerSecs: number;
+  /** Duración total de la fase (segundos): la barra del overlay la necesita. */
+  timerTotalSecs: number;
   session: any;
 }
 
@@ -457,6 +459,7 @@ export class LcuService extends EventEmitter {
       localPlayerPosition: me?.assignedPosition || '',
       phase: session.timer?.phase || '',
       timerSecs: Math.round((session.timer?.adjustedTimeLeftInPhase ?? 0) / 1000),
+      timerTotalSecs: Math.round((session.timer?.totalTimeInPhase ?? 0) / 1000),
       session,
     };
     this.emit('champ-select-update', state);

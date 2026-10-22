@@ -50,6 +50,8 @@ declare global {
       casterStart: (cfg: any) => Promise<any>;
       casterStop: () => Promise<any>;
       hudStatus: () => Promise<HudStatus>;
+      casterNewSeries: () => Promise<{ ok: boolean; games: number }>;
+      casterSeries: () => Promise<{ games: number; used: number }>;
       hudCapture: () => Promise<{ ok: boolean; file?: string; error?: string }>;
       hudOpenFolder: () => Promise<void>;
       onHudStatus: (fn: (s: HudStatus) => void) => () => void;

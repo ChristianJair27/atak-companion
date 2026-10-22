@@ -61,6 +61,21 @@ export class FeedPusher {
   get hudCount() { return this.hudEvents.length; }
   resetHud() { this.hudEvents = []; }
 
+  // ── Champ select (overlay de selección para OBS) ───────────────────────────
+  // Se manda a su propio endpoint para no pisar el snapshot in-game del canal.
+  private csLastAt = 0;
+  csStatus: { at: number; code: number | null } | null = null;
+  async pushChampSelect(cs: any, opts: { force?: boolean } = {}): Promise<void> {
+    const cfg = this.config;
+    if (!cfg) return;
+    const now = Date.now();
+    if (!opts.force && now - this.csLastAt < 900) return; // el LCU se consulta cada ~1 s; con uno por segundo basta
+    this.csLastAt = now;
+    const body = { ...cs, matchLabel: cfg.matchLabel, team1: cfg.team1, team2: cfg.team2, logo1: cfg.logo1, logo2: cfg.logo2, accent: cfg.accent || '' };
+    const r = await this.post(`${cfg.backend.replace(/\/$/, '')}/api/live-feed/${cfg.channel}/champselect`, body, cfg.token);
+    this.csStatus = { at: now, code: r.code };
+  }
+
   configure(cfg: FeedConfig | null) {
     this.config = cfg;
     this.pushed = 0;

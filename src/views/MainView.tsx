@@ -229,6 +229,14 @@ export default function MainView() {
 
   const overlayUrl = `${frontend}/broadcast/${caster.channel || 'lqc-2026'}/overlay`;
   const boardUrl = `${frontend}/broadcast/${caster.channel || 'lqc-2026'}`;
+  const champSelectUrl = `${frontend}/broadcast/${caster.channel || 'lqc-2026'}/champselect`;
+  const [series, setSeries] = useState<{ games: number; used: number }>({ games: 0, used: 0 });
+  useEffect(() => {
+    if (!transmitting) return;
+    const tick = () => { void window.atak.casterSeries?.().then((s) => { if (s) setSeries(s); }).catch(() => {}); };
+    tick(); const t = window.setInterval(tick, 5000); return () => window.clearInterval(t);
+  }, [transmitting]);
+  const newSeries = async () => { const r = await window.atak.casterNewSeries?.(); if (r) setSeries({ games: 0, used: 0 }); };
 
   const set = (k: keyof CasterCfg) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setCaster((c) => ({ ...c, [k]: e.target.value }));
@@ -579,6 +587,12 @@ export default function MainView() {
                       </button>
                       <button type="button" className="hx-btn" onClick={() => copy('board', boardUrl)} title={boardUrl}>
                         <Crossfade id={copied === 'board' ? 'ok' : 'idle'}>{copied === 'board' ? '✓ Copiado' : 'Copiar link tablero'}</Crossfade>
+                      </button>
+                      <button type="button" className="hx-btn" onClick={() => copy('cs', champSelectUrl)} title={`${champSelectUrl} · fuente de navegador 1920×1080 para la selección de campeones (el caster debe estar en el lobby como espectador)`}>
+                        <Crossfade id={copied === 'cs' ? 'ok' : 'idle'}>{copied === 'cs' ? '✓ Copiado' : 'Copiar link champ select'}</Crossfade>
+                      </button>
+                      <button type="button" className="hx-btn ghost" onClick={() => { void newSeries(); }} disabled={!transmitting} title="Fearless: olvida los campeones ya usados en la serie (hazlo al empezar otra serie)">
+                        {`Nueva serie${series.games ? ` · juego ${series.games + 1}` : ''}`}
                       </button>
                       <div className="no-drag" style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }} title="Muestra la barra de transmisión (1920×112) en esta PC">
                         <span className="hx-label">Barra en esta PC</span>
