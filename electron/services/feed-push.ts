@@ -44,6 +44,22 @@ export class FeedPusher {
   config: FeedConfig | null = null;
   lastStatus: { at: number; code: number | null; error?: string } | null = null;
   pushed = 0;
+  // Objetivos leídos del HUD del espectador (hud-objectives.ts): el Live Client
+  // en modo espectador no los emite, así que se sintetizan como eventos del
+  // mismo formato y se envían junto a los reales. Se vacían al cambiar de partida.
+  private hudEvents: any[] = [];
+  private hudGameStart = 0;
+  private hudSeq = 800001;
+
+  addHudEvent(ev: { name: string; side: 'blue' | 'red'; extra: string }, state: GameState) {
+    const team = ev.side === 'blue' ? 'ORDER' : 'CHAOS';
+    const killer = state.players.find((p) => p.team === team)?.riotId || (ev.side === 'blue' ? 'Blue' : 'Red');
+    const e: any = { EventID: this.hudSeq++, EventName: ev.name, EventTime: state.gameTime, KillerName: killer, Assisters: [], hud: true };
+    if (ev.name === 'DragonKill') e.DragonType = ev.extra || 'Unknown';
+    this.hudEvents.push(e);
+  }
+  get hudCount() { return this.hudEvents.length; }
+  resetHud() { this.hudEvents = []; }
 
   configure(cfg: FeedConfig | null) {
     this.config = cfg;
@@ -54,8 +70,19 @@ export class FeedPusher {
 
   /** Jugadores + eventos en el formato del backend (lo comparten el modo caster y el automático). */
   private snapshotBase(state: GameState) {
-    const { events, eventsComplete } = selectFeedEvents(state);
+    const sel = selectFeedEvents(state);
+    // Partida nueva (el reloj retrocede): los eventos del HUD ya no valen.
+    if (state.gameTime + 30 < this.hudGameStart) this.hudEvents = [];
+    this.hudGameStart = state.gameTime;
+    let events = sel.events; let eventsComplete = sel.eventsComplete;
+    if (this.hudEvents.length) {
+      // El Live Client puede traer alguno de estos (p. ej. con un jugador dentro): no duplicar.
+      const real = new Set(events.filter((e) => /^(DragonKill|HordeKill|HeraldKill|BaronKill)$/.test(e?.EventName)).map((e) => `${e.EventName}@${Math.round((e.EventTime || 0) / 60)}`));
+      const extra = this.hudEvents.filter((e) => !real.has(`${e.EventName}@${Math.round(e.EventTime / 60)}`));
+      events = [...events, ...extra].sort((a, b) => (a?.EventTime ?? 0) - (b?.EventTime ?? 0));
+    }
     return {
+      hud: this.hudEvents.length > 0,
       gameTime: state.gameTime,
       gameMode: state.gameMode,
       mapName: state.mapName,

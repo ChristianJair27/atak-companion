@@ -23,6 +23,7 @@ import { FeedPusher, type FeedConfig } from './services/feed-push.js';
 import { ReplayFetcher } from './services/replay-fetcher.js';
 import { getPatchData } from './services/patch.js';
 import { AugmentDetector, CARD_GEOM, CARD_GEOM_ARENA } from './services/augment-detector.js';
+import { HudObjectives } from './services/hud-objectives.js';
 import { analyzeDraft, draftAiNames, type DraftRequest, rerankPicks, configureDraftAi, type PickRerankRequest, adjustRunesForDraft, getRuneCatalog } from './services/draft-ai.js';
 import {
   fetchRosterOpgg,
@@ -53,6 +54,23 @@ const FRONTEND = process.env.ATAK_FRONTEND || 'https://atakgg.revolution505.com'
 const lcu = new LcuService();
 const live = new LiveClientService();
 const feed = new FeedPusher();
+// Lector del HUD del espectador (dragones, larvas, heraldo, barón): el Live
+// Client no los emite en modo espectador. Solo corre en modo caster.
+let hud: HudObjectives | null = null;
+function hudReader(): HudObjectives {
+  if (hud) return hud;
+  hud = new HudObjectives(app.getPath('userData'), () => ({ active: Boolean(live.state?.isActive), gameTime: Number(live.state?.gameTime) || 0 }));
+  hud.on('events', (events: Array<{ name: string; side: 'blue' | 'red'; extra: string }>) => {
+    const state = live.state;
+    if (!state?.isActive) return;
+    for (const ev of events) { feed.addHudEvent(ev as any, state); console.log('[hud] evento', ev.name, ev.side, ev.extra); }
+    broadcast('hud-status', hudStatus());
+  });
+  return hud;
+}
+function hudStatus() {
+  return { active: Boolean(hud?.active), events: feed.hudCount, state: hud?.state ?? null, lastCapture: hud?.lastCapture ?? null };
+}
 // Replays de torneo: baja los .rofl que faltan en ATAK.GG cuando el cliente
 // está en reposo y los sube. Se puede apagar desde Ajustes.
 const replays = new ReplayFetcher(lcu, BACKEND);
@@ -787,7 +805,7 @@ live.on('game-ended', () => {
   closeWin('augments');
   augDetector.stop();
   closeWin('augbadges');
-  if (casterMode) void 0; // el caster sigue esperando la siguiente partida
+  if (casterMode) { feed.resetHud(); hud?.reset(); } // el caster sigue esperando la siguiente partida
 });
 // Detector visual de la oferta de augments: identifica las 3 cards por sus
 // iconos (captura de pantalla + matching) y pinta badges tier/pick% encima.
@@ -874,11 +892,12 @@ ipcMain.handle('status', () => ({
   inGame: live.state?.isActive ?? false,
   casterMode,
   feed: { active: feed.active, pushed: feed.pushed, lastStatus: feed.lastStatus },
+  hud: hudStatus(),
   backend: BACKEND,
   frontend: FRONTEND,
 }));
 ipcMain.handle('patch-data', async () => await getPatchData());
-ipcMain.handle('caster-start', (_e, cfg: FeedConfig & { showOverlay?: boolean }) => {
+ipcMain.handle('caster-start', (_e, cfg: FeedConfig & { showOverlay?: boolean; hudReader?: boolean }) => {
   casterMode = true;
   feed.configure(cfg.token ? cfg : null);
   // Prioridad total a la vista del caster: cerrar cualquier overlay in-game
@@ -889,14 +908,24 @@ ipcMain.handle('caster-start', (_e, cfg: FeedConfig & { showOverlay?: boolean })
   closeWin('champselect');
   closeWin('eog');
   if (cfg.showOverlay) ensure('caster');
+  if (cfg.token && cfg.hudReader !== false) { feed.resetHud(); hudReader().loadGeom(); hudReader().start(2500); }
   return { ok: true };
 });
 ipcMain.handle('caster-stop', () => {
   casterMode = false;
   feed.configure(null);
+  hud?.stop();
   closeWin('caster');
   return { ok: true };
 });
+ipcMain.handle('hud-status', () => hudStatus());
+// Guarda una captura completa de la pantalla (PNG) en la carpeta de datos para
+// calibrar la geometría del HUD (hud-geom.json). Solo en disco local.
+ipcMain.handle('hud-capture', async () => {
+  try { const file = await hudReader().saveCapture(); return { ok: true, file }; }
+  catch (e: any) { return { ok: false, error: String(e?.message || e) }; }
+});
+ipcMain.handle('hud-open-folder', () => { void shell.openPath(app.getPath('userData')); });
 ipcMain.on('open-external', (_e, url: string) => {
   if (/^https?:\/\//.test(String(url))) void shell.openExternal(url);
 });

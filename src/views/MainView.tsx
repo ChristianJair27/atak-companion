@@ -12,7 +12,7 @@ import { fmtClock, phaseEs, useLive, useStatus } from './shared';
 import DraftView from './DraftView';
 import { EASE, Rise, Stagger, Ticker, rise, staggerParent, swap } from '../motion';
 import { HxHex, HxPanel, HxSegmented } from './hextech';
-import type { ReplayStatus, AutofeedStatus, UpdateStatus } from '../App';
+import type { ReplayStatus, AutofeedStatus, UpdateStatus, HudStatus } from '../App';
 import './home-motion.css';
 
 // ── Movimiento (constantes a nivel de módulo: no cambian entre renders, así el
@@ -173,6 +173,30 @@ export default function MainView() {
   const frontend = String(status?.frontend || 'https://atakgg.revolution505.com').replace(/\/$/, '');
   const feed = status?.feed;
   const transmitting = Boolean(feed?.active || status?.casterMode);
+  // Lector del HUD del espectador (objetivos): estado + captura de calibración.
+  const [hud, setHud] = useState<HudStatus | null>(null);
+  const [hudCap, setHudCap] = useState<string>('');
+  useEffect(() => {
+    void window.atak.hudStatus?.().then((s) => { if (s) setHud(s); }).catch(() => {});
+    return window.atak.onHudStatus?.((s) => setHud(s));
+  }, []);
+  useEffect(() => { if (status?.hud) setHud(status.hud as HudStatus); }, [status?.hud]);
+  const hudCapture = async () => {
+    setHudCap('…');
+    const r = await window.atak.hudCapture?.();
+    setHudCap(r?.ok ? '✓ Guardada en la carpeta de datos' : `Error: ${r?.error || 'sin captura'}`);
+    window.setTimeout(() => setHudCap(''), 6000);
+  };
+  const DRAGON_ES: Record<string, string> = { Fire: 'Infernal', Earth: 'Montaña', Water: 'Océano', Air: 'Nubes', Hextech: 'Hextech', Chemtech: 'Químico', Elder: 'Anciano' };
+  const hudSide = (side: 'blue' | 'red') => {
+    const st = hud?.state; if (!st) return '—';
+    const parts: string[] = [];
+    if (st.dragons[side].length) parts.push(`🐉 ${st.dragons[side].map((d) => DRAGON_ES[d] || d).join(', ')}`);
+    if (st.grubs[side]) parts.push(`larvas ${st.grubs[side]}`);
+    if (st.herald[side]) parts.push('heraldo');
+    if (st.baron[side]) parts.push(`barón ×${st.baron[side]}`);
+    return parts.length ? parts.join(' · ') : 'nada aún';
+  };
   const last = feed?.lastStatus;
   const lastTxt = !last ? '—' : last.code === 200 ? 'OK 200' : last.error ? 'ERROR' : last.code != null ? `HTTP ${last.code}` : '—';
   const lastTone = !last ? '' : last.code === 200 ? ' ok' : ' miss';
@@ -573,6 +597,34 @@ export default function MainView() {
                     </div>
                   </Rise>
 
+                  {/* Lector del HUD: qué ha leído + captura para calibrar */}
+                  <Rise>
+                    <HxPanel corners className="hm-card" inner={{ padding: '14px 18px', display: 'grid', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <span className="hx-label head">Objetivos leídos del HUD</span>
+                        <span className="hx-mono" style={{ fontSize: 12, opacity: 0.7 }}>
+                          {hud?.lastCapture ? `última captura ${hud.lastCapture.w}×${hud.lastCapture.h}` : 'sin capturas todavía'}
+                        </span>
+                        <div className="no-drag" style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <button type="button" className="hx-btn ghost sm" onClick={() => { void hudCapture(); }} title="Guarda una captura completa de la pantalla (PNG) para ajustar la posición de los iconos del HUD">
+                            {hudCap || 'Guardar captura del HUD'}
+                          </button>
+                          <button type="button" className="hx-btn ghost sm" onClick={() => { void window.atak.hudOpenFolder?.(); }}>Abrir carpeta</button>
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13 }}>
+                        <div><span className="hx-pill" style={{ color: 'var(--ax-blue)' }}>AZUL</span> <span className="hx-mono">{hudSide('blue')}</span></div>
+                        <div><span className="hx-pill">ROJO</span> <span className="hx-mono">{hudSide('red')}</span></div>
+                      </div>
+                      <div className="hm-help">
+                        El espectador no manda dragones ni barón por la API: el companion lee los iconos de la barra superior del
+                        juego cada 2,5 s en ESTA PC (la del caster). Debe verse el HUD del espectador por defecto a pantalla completa
+                        (1920×1080 o 2560×1440), sin OBS encima. Si no detecta bien, pulsa <b>Guardar captura del HUD</b> durante una
+                        partida con dragones ya tomados y mándanos el PNG para calibrar.
+                      </div>
+                    </HxPanel>
+                  </Rise>
+
                   {/* Registro de envío */}
                   <Rise>
                     <div className="hm-bug">
@@ -593,6 +645,13 @@ export default function MainView() {
                       <div>
                         <div className="hm-bug-value">{transmitting ? lastAgo : '—'}</div>
                         <div className="hx-label">Último envío</div>
+                      </div>
+                      <span className="hm-bug-sep" />
+                      <div title="Lee la barra superior del espectador (dragones, larvas, heraldo, barón) con capturas de pantalla, porque el cliente no los manda en modo espectador">
+                        <div style={{ minHeight: 20, display: 'flex', alignItems: 'center' }}>
+                          <span className={`hx-pill${hud?.active ? ' ok' : ''}`}>{hud?.active ? `Leyendo HUD · ${hud.events} objetivos` : 'HUD apagado'}</span>
+                        </div>
+                        <div className="hx-label" style={{ marginTop: 2 }}>Objetivos</div>
                       </div>
                       <AnimatePresence initial={false}>
                         {transmitting && last?.error ? (

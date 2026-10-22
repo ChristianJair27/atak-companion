@@ -22,6 +22,13 @@ export type UpdateStatus = {
   version?: string; percent?: number; error?: string; checkedAt?: number; current?: string;
 };
 
+export interface HudStatus {
+  active: boolean;
+  events: number;
+  state: { dragons: Record<'blue' | 'red', string[]>; grubs: Record<'blue' | 'red', number>; herald: Record<'blue' | 'red', boolean>; baron: Record<'blue' | 'red', number> } | null;
+  lastCapture: { at: number; w: number; h: number } | null;
+}
+
 declare global {
   interface Window {
     atak: {
@@ -42,6 +49,10 @@ declare global {
       onLcuDisconnected: (fn: () => void) => () => void;
       casterStart: (cfg: any) => Promise<any>;
       casterStop: () => Promise<any>;
+      hudStatus: () => Promise<HudStatus>;
+      hudCapture: () => Promise<{ ok: boolean; file?: string; error?: string }>;
+      hudOpenFolder: () => Promise<void>;
+      onHudStatus: (fn: (s: HudStatus) => void) => () => void;
       opggRoster: () => Promise<any>;
       aramAugments: () => Promise<any>;
       opggBuild: (championName: string, position: string) => Promise<any>;

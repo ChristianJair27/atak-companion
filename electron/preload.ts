@@ -41,6 +41,10 @@ contextBridge.exposeInMainWorld('atak', {
   // modo caster
   casterStart: (cfg: any) => ipcRenderer.invoke('caster-start', cfg),
   casterStop: () => ipcRenderer.invoke('caster-stop'),
+  hudStatus: () => ipcRenderer.invoke('hud-status'),
+  hudCapture: () => ipcRenderer.invoke('hud-capture'),
+  hudOpenFolder: () => ipcRenderer.invoke('hud-open-folder'),
+  onHudStatus: on('hud-status'),
   // OP.GG MCP (elo / WR / build / runas / sugerencias)
   opggRoster: () => ipcRenderer.invoke('opgg-roster'),
   aramAugments: () => ipcRenderer.invoke('aram-augments'),
