@@ -95,12 +95,15 @@ interface CasterCfg {
   /** OBS (obs-websocket v5): host, puerto y contraseña; escenas por fase (vacío = no cambiar). */
   obsHost: string; obsPort: string; obsPassword: string;
   sceneChampSelect: string; sceneInGame: string; scenePostGame: string; sceneIdle: string;
+  /** Repetición instantánea automática: escena, fuente Multimedia y duración. */
+  sceneReplay: string; replaySource: string; replaySecs: string; autoReplay: boolean;
 }
 
 const defaultCfg: CasterCfg = {
   channel: 'lqc-2026', token: '', matchLabel: '', team1: '', team2: '',
   streamUrl: '', logo1: '', logo2: '', accent: '',
   obsHost: '127.0.0.1', obsPort: '4455', obsPassword: '', sceneChampSelect: '', sceneInGame: '', scenePostGame: '', sceneIdle: '',
+  sceneReplay: '', replaySource: 'Replay', replaySecs: '12', autoReplay: true,
 };
 
 const loadCfg = (): CasterCfg => {
@@ -221,7 +224,7 @@ export default function MainView() {
       if (transmitting) await window.atak.casterStop();
       else await window.atak.casterStart({
         ...caster, backend: status?.backend, showOverlay,
-        obs: caster.obsHost || caster.obsPort ? { host: caster.obsHost, port: Number(caster.obsPort) || 4455, password: caster.obsPassword, scenes: { champselect: caster.sceneChampSelect, ingame: caster.sceneInGame, postgame: caster.scenePostGame, idle: caster.sceneIdle } } : null,
+        obs: caster.obsHost || caster.obsPort ? { host: caster.obsHost, port: Number(caster.obsPort) || 4455, password: caster.obsPassword, scenes: { champselect: caster.sceneChampSelect, ingame: caster.sceneInGame, postgame: caster.scenePostGame, idle: caster.sceneIdle, replay: caster.sceneReplay }, replay: { auto: caster.autoReplay, source: caster.replaySource || 'Replay', secs: Number(caster.replaySecs) || 12 } } : null,
       });
     } finally {
       setBusy(false);
@@ -258,7 +261,9 @@ export default function MainView() {
     const r = await window.atak.obsTest?.({ host: caster.obsHost, port: Number(caster.obsPort) || 4455, password: caster.obsPassword });
     if (r?.ok) { setObsScenes(r.scenes); setObsMsg(`✓ Conectado · ${r.scenes.length} escenas`); } else setObsMsg(r?.error || 'No conecta');
   };
-  const sceneSel = (k: 'sceneChampSelect' | 'sceneInGame' | 'scenePostGame' | 'sceneIdle', label: string) => (
+  const [replayMsg, setReplayMsg] = useState('');
+  const doReplay = async () => { setReplayMsg('…'); const r = await window.atak.obsReplay?.(); setReplayMsg(r?.ok ? '✓ Repetición mostrada' : `Error: ${r?.error || 'sin respuesta'}`); window.setTimeout(() => setReplayMsg(''), 6000); };
+  const sceneSel = (k: 'sceneChampSelect' | 'sceneInGame' | 'scenePostGame' | 'sceneIdle' | 'sceneReplay', label: string) => (
     <div>
       <span className="hx-label">{label}</span>
       {obsScenes.length ? (
@@ -656,7 +661,7 @@ export default function MainView() {
                         <span className={`hx-pill${obs?.connected ? ' ok' : obs?.configured ? ' miss' : ''}`}>{obs?.connected ? `Conectado · ${obs.scene || 'sin escena'}` : obs?.configured ? (obs.error || 'Conectando…') : 'Apagado'}</span>
                         <div className="no-drag" style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
                           <button type="button" className="hx-btn ghost sm" onClick={() => { void obsTest(); }}>Probar conexión</button>
-                          <button type="button" className="hx-btn ghost sm" disabled={!obs?.connected} onClick={() => { void window.atak.obsReplay?.(); }} title="Guarda el búfer de repetición de OBS (debe estar activo)">Guardar repetición</button>
+                          <button type="button" className="hx-btn ghost sm" disabled={!obs?.connected} onClick={() => { void doReplay(); }} title="Guarda el búfer de repetición de OBS, lo carga en la fuente Multimedia y muestra la escena de repetición">{replayMsg || 'Repetición ahora'}</button>
                         </div>
                       </div>
                       {obsMsg && <div className="hx-mono" style={{ fontSize: 12.5 }}>{obsMsg}</div>}
@@ -671,10 +676,21 @@ export default function MainView() {
                         {sceneSel('scenePostGame', 'Post-partida')}
                         {sceneSel('sceneIdle', 'Espera')}
                       </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.6fr auto', gap: 8, alignItems: 'end' }}>
+                        {sceneSel('sceneReplay', 'Escena de repetición')}
+                        <div><span className="hx-label">Fuente Multimedia</span><input className={inputCls(true)} placeholder="Replay" value={caster.replaySource} disabled={transmitting} onChange={set('replaySource')} /></div>
+                        <div><span className="hx-label">Segundos</span><input className={inputCls(true)} placeholder="12" value={caster.replaySecs} disabled={transmitting} onChange={set('replaySecs')} /></div>
+                        <label className="no-drag" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, paddingBottom: 8 }}>
+                          <input type="checkbox" checked={caster.autoReplay} disabled={transmitting} onChange={(e) => setCaster((c) => ({ ...c, autoReplay: e.target.checked }))} /> Automática
+                        </label>
+                      </div>
                       <div className="hm-help">
                         Con la transmisión iniciada, el companion cambia la escena de OBS solo: al entrar en selección de campeones,
                         al cargar la partida, al terminar y al volver al lobby. En OBS: Herramientas → Ajustes del servidor WebSocket →
                         activar y copiar la contraseña. Deja vacía una fase para no tocarla.
+                        Repetición automática: con el búfer de repetición activo en OBS (Salida → Búfer de repetición, 30 s) y una
+                        fuente Multimedia con ese nombre en la escena de repetición, tras un triple o mayor, un ACE, barón o anciano
+                        el companion guarda el búfer, lo carga en la fuente y muestra esa escena los segundos indicados (máximo una por minuto).
                       </div>
                     </HxPanel>
                   </Rise>

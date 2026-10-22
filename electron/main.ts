@@ -73,6 +73,52 @@ function hudReader(): HudObjectives {
 const obs = new ObsClient();
 let obsScenes: ObsScenes = {};
 obs.on('status', () => broadcast('obs-status', obs.status()));
+let bufferChecked = false;
+obs.on('status', () => {
+  if (obs.connected && casterMode && !bufferChecked) { bufferChecked = true; void obs.ensureReplayBuffer(); }
+  if (!obs.connected) bufferChecked = false;
+});
+// Repetición instantánea automática: en un momento grande (multikill, ace, barón,
+// anciano) se guarda el búfer de repetición de OBS, se carga en la fuente
+// Multimedia y se muestra la escena de repetición unos segundos.
+let replayCfg: { auto: boolean; source: string; secs: number; delay: number } = { auto: false, source: 'Replay', secs: 12, delay: 7 };
+let replayBusy = false; let lastReplayAt = 0; let lastSeenEventId = -1;
+const REPLAY_EVENTS = new Set(['Ace', 'BaronKill', 'Multikill']);
+function isBigMoment(e: any): boolean {
+  if (e?.EventName === 'Multikill') return Number(e.KillStreak) >= 3;
+  if (e?.EventName === 'DragonKill') return String(e.DragonType) === 'Elder';
+  return REPLAY_EVENTS.has(String(e?.EventName));
+}
+async function showReplay(reason: string): Promise<{ ok: boolean; error?: string }> {
+  if (!obs.connected) return { ok: false, error: 'OBS no conectado' };
+  if (replayBusy) return { ok: false, error: 'ya hay una repetición en curso' };
+  replayBusy = true;
+  try {
+    if (!(await obs.saveReplayBuffer())) return { ok: false, error: obs.lastError || 'no se pudo guardar el búfer (¿está activo en OBS?)' };
+    await new Promise((r) => setTimeout(r, 1500));
+    const file = await obs.lastReplayPath();
+    if (!file) return { ok: false, error: 'OBS no devolvió el archivo de la repetición' };
+    if (replayCfg.source && !(await obs.playMedia(replayCfg.source, file))) return { ok: false, error: obs.lastError };
+    const back = obs.currentScene;
+    if (obsScenes.replay) {
+      await obs.setScene(obsScenes.replay).catch(() => {});
+      setTimeout(() => { if (casterMode && obs.connected) obs.setScene(obsScenes.ingame || back).catch(() => {}); }, Math.max(3, replayCfg.secs) * 1000);
+    }
+    lastReplayAt = Date.now();
+    console.log('[obs] repetición', reason, file);
+    return { ok: true };
+  } finally { replayBusy = false; }
+}
+function maybeAutoReplay(events: any[]) {
+  if (!casterMode || !replayCfg.auto || !obs.connected || !Array.isArray(events)) return;
+  let maxId = lastSeenEventId; let trigger: any = null;
+  for (const e of events) { const id = Number(e?.EventID); if (!(id > lastSeenEventId)) continue; if (id > maxId) maxId = id; if (isBigMoment(e)) trigger = e; }
+  if (lastSeenEventId < 0) { lastSeenEventId = maxId; return; } // primera lectura: no repetir lo viejo
+  lastSeenEventId = maxId;
+  if (!trigger || Date.now() - lastReplayAt < 60_000 || replayBusy) return;
+  const why = `${trigger.EventName}${trigger.KillStreak ? ` x${trigger.KillStreak}` : ''}`;
+  setTimeout(() => { void showReplay(why); }, Math.max(2, replayCfg.delay) * 1000);
+}
 function obsScene(kind: keyof ObsScenes) {
   const name = obsScenes[kind];
   if (!casterMode || !obs.connected || !name) return;
@@ -926,7 +972,7 @@ live.on('state', (state) => {
       }
     })();
   }
-  if (Array.isArray(state?.events)) lastLiveEvents = state.events;
+  if (Array.isArray(state?.events)) { lastLiveEvents = state.events; maybeAutoReplay(state.events); }
   if (state?.mapNumber) lastMapNumber = Number(state.mapNumber) || 11;
   const me = (state?.players || []).find((p: any) => p.isMe);
   if (me) {
@@ -972,9 +1018,11 @@ ipcMain.handle('status', () => ({
   frontend: FRONTEND,
 }));
 ipcMain.handle('patch-data', async () => await getPatchData());
-ipcMain.handle('caster-start', (_e, cfg: FeedConfig & { showOverlay?: boolean; hudReader?: boolean; obs?: { host: string; port: number; password: string; scenes: ObsScenes } | null }) => {
+ipcMain.handle('caster-start', (_e, cfg: FeedConfig & { showOverlay?: boolean; hudReader?: boolean; obs?: { host: string; port: number; password: string; scenes: ObsScenes; replay?: { auto: boolean; source: string; secs: number } } | null }) => {
   casterMode = true;
   obsScenes = cfg.obs?.scenes || {};
+  replayCfg = { auto: !!cfg.obs?.replay?.auto, source: cfg.obs?.replay?.source || 'Replay', secs: Number(cfg.obs?.replay?.secs) || 12, delay: 7 };
+  lastSeenEventId = -1; lastReplayAt = 0;
   obs.configure(cfg.obs && (cfg.obs.host || cfg.obs.port) ? { host: cfg.obs.host || '127.0.0.1', port: Number(cfg.obs.port) || 4455, password: cfg.obs.password || '' } : null);
   feed.configure(cfg.token ? cfg : null);
   // Prioridad total a la vista del caster: cerrar cualquier overlay in-game
@@ -1012,7 +1060,7 @@ ipcMain.handle('obs-test', async (_e, cfg: { host: string; port: number; passwor
   try { const scenes = await obs.scenes(); if (!casterMode) obs.configure(null); return { ok: true, scenes }; }
   catch (e: any) { if (!casterMode) obs.configure(null); return { ok: false, error: String(e?.message || e), scenes: [] }; }
 });
-ipcMain.handle('obs-replay', async () => ({ ok: await obs.saveReplayBuffer() }));
+ipcMain.handle('obs-replay', async () => showReplay('manual'));
 // Guarda una captura completa de la pantalla (PNG) en la carpeta de datos para
 // calibrar la geometría del HUD (hud-geom.json). Solo en disco local.
 ipcMain.handle('hud-capture', async () => {

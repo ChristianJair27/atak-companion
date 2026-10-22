@@ -8,7 +8,7 @@ import { EventEmitter } from 'node:events';
 import WebSocket from 'ws';
 
 export interface ObsConfig { host: string; port: number; password: string }
-export interface ObsScenes { champselect?: string; ingame?: string; postgame?: string; idle?: string }
+export interface ObsScenes { champselect?: string; ingame?: string; postgame?: string; idle?: string; replay?: string }
 
 export class ObsClient extends EventEmitter {
   private ws: WebSocket | null = null;
@@ -92,6 +92,27 @@ export class ObsClient extends EventEmitter {
   /** Guarda el búfer de repetición de OBS (si está activo): repetición instantánea sin tocar el teclado. */
   async saveReplayBuffer(): Promise<boolean> {
     try { await this.request('SaveReplayBuffer'); return true; } catch { return false; }
+  }
+  /** ¿Está activo el búfer de repetición? Si no, intenta arrancarlo (OBS debe tenerlo configurado en Salida). */
+  async ensureReplayBuffer(): Promise<boolean> {
+    try {
+      const st = await this.request('GetReplayBufferStatus');
+      if (st?.outputActive) return true;
+      await this.request('StartReplayBuffer');
+      return true;
+    } catch (e: any) { this.lastError = `Búfer de repetición: ${e.message}`; this.emit('status'); return false; }
+  }
+  /** Ruta del último archivo guardado por el búfer (tras SaveReplayBuffer tarda ~1 s en escribirse). */
+  async lastReplayPath(): Promise<string> {
+    try { const r = await this.request('GetLastReplayBufferReplay'); return String(r?.savedReplayPath || ''); } catch { return ''; }
+  }
+  /** Pone un archivo en una fuente Multimedia y la reinicia (la reproduce desde el principio). */
+  async playMedia(inputName: string, file: string): Promise<boolean> {
+    try {
+      await this.request('SetInputSettings', { inputName, inputSettings: { local_file: file, is_local_file: true, restart_on_activate: true }, overlay: true });
+      await this.request('TriggerMediaInputAction', { inputName, mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART' });
+      return true;
+    } catch (e: any) { this.lastError = `Fuente "${inputName}": ${e.message}`; this.emit('status'); return false; }
   }
   status() { return { connected: this.connected, error: this.lastError, scene: this.currentScene, configured: !!this.cfg }; }
 }
