@@ -569,7 +569,7 @@ lcu.on('champ-select-update', (state) => {
         phase: csPayload.phase, actionType: csPayload.actionType, timerSecs: csPayload.timerSecs, timerTotalSecs: state.timerTotalSecs,
         blue: all.filter((c) => side(c) === 'blue').map(cell),
         red: all.filter((c) => side(c) === 'red').map(cell),
-        bans: { blue: (myIsBlue ? csPayload.bans.ally : csPayload.bans.enemy).map((b: any) => b.id), red: (myIsBlue ? csPayload.bans.enemy : csPayload.bans.ally).map((b: any) => b.id) },
+        bans: bansBySide(state.session, myIsBlue ? csPayload.bans.ally : csPayload.bans.enemy, myIsBlue ? csPayload.bans.enemy : csPayload.bans.ally),
         used: seriesUsed.forSides(all.filter((c) => side(c) === 'blue').map((c) => c.puuid), all.filter((c) => side(c) === 'red').map((c) => c.puuid)),
         game: seriesUsed.games + 1,
       };
@@ -578,6 +578,23 @@ lcu.on('champ-select-update', (state) => {
     }
   })();
 });
+// Baneos por lado. En partidas con código de torneo el cliente deja vacío
+// session.bans para el espectador: los baneos solo vienen en las acciones
+// (type 'ban', completadas, con su actorCellId: 0-4 azul, 5-9 rojo).
+function bansBySide(session: any, blueFallback: any[], redFallback: any[]): { blue: number[]; red: number[] } {
+  const out = { blue: [] as number[], red: [] as number[] };
+  for (const group of (session?.actions || []) as any[][]) {
+    for (const a of group || []) {
+      if (String(a?.type) !== 'ban' || !a?.completed || !(Number(a?.championId) > 0)) continue;
+      (Number(a.actorCellId) < 5 ? out.blue : out.red).push(Number(a.championId));
+    }
+  }
+  if (!out.blue.length && !out.red.length) {
+    out.blue = (blueFallback || []).map((b: any) => Number(b.id)).filter(Boolean);
+    out.red = (redFallback || []).map((b: any) => Number(b.id)).filter(Boolean);
+  }
+  return out;
+}
 // Fearless: campeones ya usados en la serie, por jugador (puuid). Así da igual
 // que los equipos cambien de lado entre partidas. Se guarda en disco por canal
 // y se limpia con "Nueva serie" o al cambiar los equipos del modo caster.
