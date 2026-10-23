@@ -32,9 +32,18 @@ export class ObsClient extends EventEmitter {
       const ws = new WebSocket(`ws://${cfg.host || '127.0.0.1'}:${cfg.port || 4455}`);
       this.ws = ws;
       ws.on('message', (data) => this.onMessage(String(data)));
-      ws.on('close', () => { this.connected = false; this.emit('status'); this.scheduleReconnect(); });
-      ws.on('error', (e) => { this.lastError = e.message; this.connected = false; this.emit('status'); });
+      ws.on('close', (code: number) => { if (code === 4009) this.lastError = 'OBS rechazó la contraseña: cópiala de nuevo en "Mostrar información de conexión".'; else if (code === 4010) this.lastError = 'Versión de OBS WebSocket no compatible: actualiza OBS a la 28 o más nueva.'; this.connected = false; this.emit('status'); this.scheduleReconnect(); });
+      ws.on('error', (e: any) => { this.lastError = ObsClient.explain(e, cfg); this.connected = false; this.emit('status'); });
     } catch (e: any) { this.lastError = e.message; this.scheduleReconnect(); }
+  }
+  /** Errores de conexión en palabras del caster (lo más común: el servidor WebSocket de OBS apagado). */
+  static explain(e: any, cfg: ObsConfig): string {
+    const code = String(e?.code || '');
+    const where = `${cfg.host || '127.0.0.1'}:${cfg.port || 4455}`;
+    if (code === 'ECONNREFUSED') return `OBS no responde en ${where}: abre OBS (28 o más nuevo) y activa Herramientas → Ajustes del servidor WebSocket → "Habilitar servidor WebSocket", puerto 4455, Aplicar. Si OBS está en esta misma PC usa 127.0.0.1.`;
+    if (code === 'ETIMEDOUT' || code === 'EHOSTUNREACH' || code === 'ENETUNREACH') return `No se llega a ${where}: si OBS está en esta PC usa 127.0.0.1; si está en otra, revisa la IP y que el Firewall de Windows permita OBS.`;
+    if (/401|auth/i.test(String(e?.message))) return 'OBS rechazó la contraseña: cópiala de nuevo en "Mostrar información de conexión".';
+    return String(e?.message || e);
   }
   private scheduleReconnect() {
     if (!this.cfg || this.reconnectTimer) return;

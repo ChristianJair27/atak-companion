@@ -716,7 +716,7 @@ export default function MainView() {
                       </div>
                       <div className="hm-help">
                         El espectador no manda dragones ni barón por la API: el companion lee los iconos de la barra superior del
-                        juego cada 2,5 s en ESTA PC (la del caster). Debe verse el HUD del espectador por defecto a pantalla completa
+                        juego cada segundo en ESTA PC (la del caster). Debe verse el HUD del espectador por defecto a pantalla completa
                         (1920×1080 o 2560×1440), sin OBS encima. Si no detecta bien, pulsa <b>Guardar captura del HUD</b> durante una
                         partida con dragones ya tomados y mándanos el PNG para calibrar.
                       </div>
