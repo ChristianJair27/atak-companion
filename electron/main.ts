@@ -25,6 +25,7 @@ import { getPatchData } from './services/patch.js';
 import { AugmentDetector, CARD_GEOM, CARD_GEOM_ARENA } from './services/augment-detector.js';
 import { HudObjectives } from './services/hud-objectives.js';
 import { ObsClient, type ObsScenes } from './services/obs.js';
+import WsClient from 'ws';
 import { analyzeDraft, draftAiNames, type DraftRequest, rerankPicks, configureDraftAi, type PickRerankRequest, adjustRunesForDraft, getRuneCatalog } from './services/draft-ai.js';
 import {
   fetchRosterOpgg,
@@ -1051,13 +1052,54 @@ ipcMain.handle('caster-stop', () => {
 ipcMain.handle('hud-status', () => hudStatus());
 ipcMain.handle('obs-status', () => obs.status());
 ipcMain.handle('obs-scenes', async () => { try { return { ok: true, scenes: await obs.scenes() }; } catch (e: any) { return { ok: false, error: String(e?.message || e), scenes: [] }; } });
+// Diagnóstico de OBS: ¿qué puertos escuchan en esta PC y qué responde cada uno?
+// obs-websocket v5 (OBS 28+) manda un Hello JSON con "op":0 nada más conectar;
+// el plugin viejo v4 (OBS 27, puerto 4444) no manda nada.
+function probePort(host: string, port: number): Promise<'closed' | 'v5' | 'other'> {
+  return new Promise((resolve) => {
+    let done = false; const finish = (r: 'closed' | 'v5' | 'other') => { if (!done) { done = true; try { ws.terminate(); } catch { /* */ } resolve(r); } };
+    let ws: any;
+    try {
+      ws = new WsClient(`ws://${host}:${port}`, { handshakeTimeout: 2500 });
+      ws.on('message', (d: any) => { try { finish(JSON.parse(String(d))?.op === 0 ? 'v5' : 'other'); } catch { finish('other'); } });
+      ws.on('open', () => setTimeout(() => finish('other'), 1500));
+      ws.on('error', () => finish('closed'));
+      setTimeout(() => finish('closed'), 3500);
+    } catch { finish('closed'); }
+  });
+}
+async function diagnoseObs(host: string, port: number): Promise<{ host: string; port: number } | string> {
+  const tries: Array<[string, number]> = [[host, port], ['127.0.0.1', port], ['127.0.0.1', 4455], ['127.0.0.1', 4444], ['127.0.0.1', 4456]];
+  const seen = new Set<string>(); const res: Array<[string, number, string]> = [];
+  for (const [h, p] of tries) { const k = `${h}:${p}`; if (seen.has(k)) continue; seen.add(k); res.push([h, p, await probePort(h, p)]); }
+  const v5 = res.find((r) => r[2] === 'v5');
+  if (v5) return { host: v5[0], port: v5[1] };
+  const old = res.find((r) => r[1] === 4444 && r[2] === 'other');
+  if (old) return 'Tu OBS tiene el plugin WebSocket VIEJO (puerto 4444). Actualiza OBS a la versión 28 o más nueva (obsproject.com) y vuelve a habilitar el servidor WebSocket en el puerto 4455.';
+  const other = res.find((r) => r[2] === 'other');
+  if (other) return `En ${other[0]}:${other[1]} responde algo que no es OBS. Cambia el puerto del servidor WebSocket de OBS (p. ej. 4460) y ponlo igual aquí.`;
+  return 'OBS no está escuchando en ningún puerto de esta PC. Revisa: 1) que OBS esté abierto en ESTA misma PC; 2) Ayuda → Acerca de: versión 28 o más nueva; 3) Herramientas → Ajustes del servidor WebSocket → casilla "Habilitar servidor WebSocket" marcada → Aplicar; 4) si OBS mostró un aviso de que el servidor no pudo arrancar, cambia el puerto a 4460 y reinicia OBS.';
+}
 ipcMain.handle('obs-test', async (_e, cfg: { host: string; port: number; password: string }) => {
   // Conecta con lo que haya en el formulario (sin iniciar la transmisión) y lista las escenas.
-  obs.configure({ host: cfg.host || '127.0.0.1', port: Number(cfg.port) || 4455, password: cfg.password || '' });
-  const until = Date.now() + 4000;
-  while (!obs.connected && Date.now() < until) await new Promise((r) => setTimeout(r, 150));
+  // Si no conecta, diagnostica (otra IP/puerto local, OBS viejo, servidor apagado) y reintenta con lo que sí responda.
+  const tryConnect = async (host: string, port: number) => {
+    obs.configure({ host, port, password: cfg.password || '' });
+    const until = Date.now() + 4000;
+    while (!obs.connected && Date.now() < until) await new Promise((r) => setTimeout(r, 150));
+    return obs.connected;
+  };
+  let host = cfg.host || '127.0.0.1', port = Number(cfg.port) || 4455;
+  if (!(await tryConnect(host, port))) {
+    const firstErr = obs.lastError;
+    obs.configure(null);
+    const d = await diagnoseObs(host, port);
+    if (typeof d === 'string') return { ok: false, error: d, scenes: [] };
+    if (!(await tryConnect(d.host, d.port))) { const err = obs.lastError || firstErr; if (!casterMode) obs.configure(null); return { ok: false, error: err, scenes: [] }; }
+    host = d.host; port = d.port;
+  }
   if (!obs.connected) { const err = obs.lastError || 'No conecta: ¿OBS abierto con el servidor WebSocket activado (Herramientas → Ajustes del servidor WebSocket)?'; if (!casterMode) obs.configure(null); return { ok: false, error: err, scenes: [] }; }
-  try { const scenes = await obs.scenes(); if (!casterMode) obs.configure(null); return { ok: true, scenes }; }
+  try { const scenes = await obs.scenes(); if (!casterMode) obs.configure(null); return { ok: true, scenes, host, port }; }
   catch (e: any) { if (!casterMode) obs.configure(null); return { ok: false, error: String(e?.message || e), scenes: [] }; }
 });
 ipcMain.handle('obs-replay', async () => showReplay('manual'));

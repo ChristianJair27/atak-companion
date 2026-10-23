@@ -54,7 +54,7 @@ declare global {
       casterNewSeries: () => Promise<{ ok: boolean; games: number }>;
       obsStatus: () => Promise<ObsStatus>;
       obsScenes: () => Promise<{ ok: boolean; scenes: string[]; error?: string }>;
-      obsTest: (cfg: { host: string; port: number; password: string }) => Promise<{ ok: boolean; scenes: string[]; error?: string }>;
+      obsTest: (cfg: { host: string; port: number; password: string }) => Promise<{ ok: boolean; scenes: string[]; error?: string; host?: string; port?: number }>;
       obsReplay: () => Promise<{ ok: boolean; error?: string }>;
       onObsStatus: (fn: (s: ObsStatus) => void) => () => void;
       casterSeries: () => Promise<{ games: number; used: number }>;

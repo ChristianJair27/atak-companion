@@ -259,7 +259,12 @@ export default function MainView() {
   const obsTest = async () => {
     setObsMsg('Conectando…');
     const r = await window.atak.obsTest?.({ host: caster.obsHost, port: Number(caster.obsPort) || 4455, password: caster.obsPassword });
-    if (r?.ok) { setObsScenes(r.scenes); setObsMsg(`✓ Conectado · ${r.scenes.length} escenas`); } else setObsMsg(r?.error || 'No conecta');
+    if (r?.ok) {
+      setObsScenes(r.scenes);
+      const fixed = r.host && (r.host !== caster.obsHost || String(r.port) !== String(caster.obsPort));
+      if (fixed) setCaster((c) => ({ ...c, obsHost: String(r.host), obsPort: String(r.port) }));
+      setObsMsg(`✓ Conectado · ${r.scenes.length} escenas${fixed ? ` · OBS estaba en ${r.host}:${r.port} (ya lo cambié)` : ''}`);
+    } else setObsMsg(r?.error || 'No conecta');
   };
   const [replayMsg, setReplayMsg] = useState('');
   const doReplay = async () => { setReplayMsg('…'); const r = await window.atak.obsReplay?.(); setReplayMsg(r?.ok ? '✓ Repetición mostrada' : `Error: ${r?.error || 'sin respuesta'}`); window.setTimeout(() => setReplayMsg(''), 6000); };
