@@ -97,13 +97,15 @@ interface CasterCfg {
   sceneChampSelect: string; sceneInGame: string; scenePostGame: string; sceneIdle: string;
   /** Repetición instantánea automática: escena, fuente Multimedia y duración. */
   sceneReplay: string; replaySource: string; replaySecs: string; autoReplay: boolean;
+  /** Leer dragones/larvas/barón del HUD con capturas de pantalla (pesado: apagado por defecto). */
+  hudReader: boolean;
 }
 
 const defaultCfg: CasterCfg = {
   channel: 'lqc-2026', token: '', matchLabel: '', team1: '', team2: '',
   streamUrl: '', logo1: '', logo2: '', accent: '',
   obsHost: '127.0.0.1', obsPort: '4455', obsPassword: '', sceneChampSelect: '', sceneInGame: '', scenePostGame: '', sceneIdle: '',
-  sceneReplay: '', replaySource: 'Replay', replaySecs: '12', autoReplay: true,
+  sceneReplay: '', replaySource: 'Replay', replaySecs: '12', autoReplay: true, hudReader: false,
 };
 
 const loadCfg = (): CasterCfg => {
@@ -223,7 +225,7 @@ export default function MainView() {
     try {
       if (transmitting) await window.atak.casterStop();
       else await window.atak.casterStart({
-        ...caster, backend: status?.backend, showOverlay,
+        ...caster, backend: status?.backend, showOverlay, hudReader: caster.hudReader === true,
         obs: caster.obsHost || caster.obsPort ? { host: caster.obsHost, port: Number(caster.obsPort) || 4455, password: caster.obsPassword, scenes: { champselect: caster.sceneChampSelect, ingame: caster.sceneInGame, postgame: caster.scenePostGame, idle: caster.sceneIdle, replay: caster.sceneReplay }, replay: { auto: caster.autoReplay, source: caster.replaySource || 'Replay', secs: Number(caster.replaySecs) || 12 } } : null,
       });
     } finally {
@@ -705,6 +707,9 @@ export default function MainView() {
                     <HxPanel corners className="hm-card" inner={{ padding: '14px 18px', display: 'grid', gap: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         <span className="hx-label head">Objetivos leídos del HUD</span>
+                        <label className="no-drag" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }} title="Captura la pantalla para leer dragones, larvas y barón. Consume recursos: déjalo apagado si el juego se traba">
+                          <input type="checkbox" checked={caster.hudReader === true} disabled={transmitting} onChange={(e) => setCaster((c) => ({ ...c, hudReader: e.target.checked }))} /> Activar (experimental)
+                        </label>
                         <span className="hx-mono" style={{ fontSize: 12, opacity: 0.7 }}>
                           {hud?.lastCapture ? `última captura ${hud.lastCapture.w}×${hud.lastCapture.h}` : 'sin capturas todavía'}
                         </span>

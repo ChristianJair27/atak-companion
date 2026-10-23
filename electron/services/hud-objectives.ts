@@ -183,9 +183,11 @@ export class HudObjectives extends EventEmitter {
   }
 
   private async capture(): Promise<Electron.NativeImage | null> {
-    const { width, height } = screen.getPrimaryDisplay().size;
-    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width, height } });
-    const shot = sources[0]?.thumbnail;
+    // Solo la pantalla principal y a 1920 de ancho como mucho: capturar todos los monitores
+    // a resolución completa saturaba la PC del caster.
+    const d = screen.getPrimaryDisplay(); const k = Math.min(1, 1920 / d.size.width);
+    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: Math.round(d.size.width * k), height: Math.round(d.size.height * k) } });
+    const shot = (sources.find((x) => String(x.display_id) === String(d.id)) || sources[0])?.thumbnail;
     if (!shot || shot.isEmpty()) return null;
     const s = shot.getSize(); this.lastCapture = { at: Date.now(), w: s.width, h: s.height };
     return shot;

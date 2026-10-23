@@ -1051,7 +1051,9 @@ ipcMain.handle('caster-start', (_e, cfg: FeedConfig & { showOverlay?: boolean; h
   closeWin('champselect');
   closeWin('eog');
   if (cfg.showOverlay) ensure('caster');
-  if (cfg.token && cfg.hudReader !== false) { feed.resetHud(); hudReader().loadGeom(); hudReader().start(1000); }
+  // Lector del HUD: APAGADO salvo que el caster lo active. Capturar la pantalla cada
+  // segundo trababa LoL y dejaba negra la ventana del companion en la PC del caster.
+  if (cfg.token && cfg.hudReader === true) { feed.resetHud(); hudReader().loadGeom(); hudReader().start(2500); } else { hud?.stop(); }
   seriesUsed.load(`${cfg.channel}|${cfg.team1}|${cfg.team2}`);
   return { ok: true };
 });
